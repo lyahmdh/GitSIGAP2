@@ -1,265 +1,449 @@
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import Loading from '../../components/Loading';
+import Icon from '../../components/report/icons';
+import StatusBadge from '../../components/StatusBadge';
+import reportService from '../../services/reportService';
+import { formatDate, storageUrl } from '../../utils/format';
 
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+const PER_PAGE = 12;
 
-const reports = [
-    {
-        id: 1,
-        title: 'Jalan Rusak di Area Perumahan',
-        category: 'Jalan & Transportasi',
-        description:
-            'Terdapat beberapa lubang pada jalan yang membahayakan pengendara.',
-        location: 'Lowokwaru, Kota Malang',
-        date: '20 November 2026',
-        status: 'Ditindaklanjuti',
-    },
-    {
-        id: 2,
-        title: 'Lampu Penerangan Jalan Tidak Menyala',
-        category: 'Penerangan Umum',
-        description:
-            'Lampu penerangan jalan sudah beberapa hari tidak berfungsi.',
-        location: 'Klojen, Kota Malang',
-        date: '19 November 2026',
-        status: 'Diverifikasi',
-    },
-    {
-        id: 3,
-        title: 'Saluran Drainase Tersumbat',
-        category: 'Air & Drainase',
-        description:
-            'Saluran air tersumbat oleh sampah sehingga air tidak mengalir dengan baik.',
-        location: 'Sukun, Kota Malang',
-        date: '18 November 2026',
-        status: 'Selesai',
-    },
-    {
-        id: 4,
-        title: 'Kerusakan Fasilitas Taman Kota',
-        category: 'Ruang Publik',
-        description:
-            'Beberapa fasilitas tempat duduk di taman mengalami kerusakan.',
-        location: 'Kedungkandang, Kota Malang',
-        date: '17 November 2026',
-        status: 'Masuk',
-    },
-    {
-        id: 5,
-        title: 'Jalan Berlubang Dekat Sekolah',
-        category: 'Jalan & Transportasi',
-        description:
-            'Kondisi jalan berlubang mengganggu akses menuju lingkungan sekolah.',
-        location: 'Blimbing, Kota Malang',
-        date: '16 November 2026',
-        status: 'Ditindaklanjuti',
-    },
-    {
-        id: 6,
-        title: 'Kebocoran Saluran Air',
-        category: 'Air & Drainase',
-        description:
-            'Terdapat kebocoran pada saluran air yang menyebabkan genangan.',
-        location: 'Lowokwaru, Kota Malang',
-        date: '15 November 2026',
-        status: 'Selesai',
-    },
+// Opsi status mengikuti Blade. "Ditolak" tidak ditampilkan karena laporan ditolak
+// memang disembunyikan dari publik (API menyaring status != ditolak).
+const STATUS_OPTIONS = [
+    { value: 'masuk', label: 'Laporan Masuk' },
+    { value: 'diverifikasi', label: 'Diverifikasi' },
+    { value: 'ditindaklanjuti', label: 'Ditindaklanjuti' },
+    { value: 'selesai', label: 'Selesai' },
 ];
 
-const categories = [
-    'Semua Kategori',
-    'Jalan & Transportasi',
-    'Air & Drainase',
-    'Ruang Publik',
-    'Penerangan Umum',
-];
+const FILTER_KEYS = ['kecamatan', 'kategori', 'status', 'q', 'sort'];
 
-const statusColors = {
-    Masuk: 'bg-blue-100 text-blue-700',
-    Diverifikasi: 'bg-yellow-100 text-yellow-700',
-    Ditindaklanjuti: 'bg-purple-100 text-purple-700',
-    Selesai: 'bg-green-100 text-green-700',
-};
+const selectClass = 'field-input !bg-cream !py-2.5 !text-sm focus:!bg-white';
 
-function ReportCard({ report }) {
+function PageHeader() {
     return (
-        <article className="flex flex-col rounded-xl border border-gray-200 bg-white p-5 transition hover:-translate-y-1 hover:shadow-md">
-            <div className="mb-4 flex items-start justify-between gap-3">
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                    {report.category}
-                </span>
+        <div className="relative overflow-hidden bg-[linear-gradient(135deg,var(--color-green-dark)_0%,var(--color-green-mid)_70%,var(--color-brown-dark)_100%)] pb-10 pt-14">
+            <div className="pointer-events-none absolute -right-14 -top-14 h-80 w-80 rounded-full bg-white/[0.04]" />
+            <div className="pointer-events-none absolute -bottom-10 left-[8%] h-44 w-44 rounded-full bg-accent/[0.07]" />
 
-                <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                        statusColors[report.status] ??
-                        'bg-gray-100 text-gray-600'
-                    }`}
-                >
-                    {report.status}
-                </span>
-            </div>
-
-            <h2 className="text-lg font-semibold text-gray-800">
-                {report.title}
-            </h2>
-
-            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600">
-                {report.description}
-            </p>
-
-            <div className="mt-4 space-y-2 text-sm text-gray-500">
-                <p className="flex items-center gap-2">
-                    <span>📍</span>
-                    {report.location}
-                </p>
-                <p className="flex items-center gap-2">
-                    <span>📅</span>
-                    {report.date}
+            <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
+                <h1 className="mb-1.5 font-display text-[clamp(1.8rem,4vw,2.8rem)] font-semibold text-white">
+                    Semua Proyek
+                </h1>
+                <p className="text-[0.95rem] text-white/65">
+                    Daftar seluruh laporan dan proyek pembangunan fasilitas publik yang dapat diakses
+                    masyarakat.
                 </p>
             </div>
+        </div>
+    );
+}
 
-            <div className="mt-auto border-t border-gray-100 pt-4">
+function DistrictStrip({ stats }) {
+    if (stats.length === 0) return null;
+
+    return (
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+            <div className="grid grid-cols-2 gap-4 rounded-3xl bg-[linear-gradient(90deg,#8f3d00,#b45400)] p-5 sm:grid-cols-3 md:p-6 lg:grid-cols-5 lg:gap-6">
+                {stats.map((district) => (
+                    <div
+                        key={district.name}
+                        className="rounded-[20px] bg-[#451900] px-3 py-6 text-center transition hover:-translate-y-0.5"
+                    >
+                        <div className="text-5xl font-extrabold leading-none text-white">
+                            {district.count}
+                        </div>
+                        <div className="mt-3 text-[0.95rem] font-semibold text-white">{district.name}</div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function ProjectCard({ report }) {
+    const cover = storageUrl(report.images?.[0]?.image_path);
+
+    return (
+        <article className="group flex h-full flex-col overflow-hidden rounded-[14px] border border-cream-dark bg-white shadow-card transition duration-200 hover:-translate-y-1 hover:border-green-light/25 hover:shadow-float">
+            <div className="relative h-[170px] shrink-0 overflow-hidden bg-cream-dark">
+                {cover ? (
+                    <img
+                        src={cover}
+                        alt={report.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-[400ms] group-hover:scale-105"
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted/40">
+                        <Icon name="image" className="h-10 w-10" />
+                    </div>
+                )}
+
+                <div className="absolute left-3 top-3">
+                    <StatusBadge status={report.status} />
+                </div>
+            </div>
+
+            <div className="flex flex-1 flex-col px-5 py-4">
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted">
+                    <Icon name="tag" className="h-3.5 w-3.5" />
+                    {report.category?.name || 'Umum'}
+                </p>
+
+                <h2 className="mb-2 line-clamp-2 flex-1 text-[0.975rem] font-bold leading-snug text-green-dark">
+                    {report.title}
+                </h2>
+
+                <div className="mb-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.775rem] text-muted">
+                    <span className="flex items-center gap-1">
+                        <Icon name="pin" className="h-3.5 w-3.5" />
+                        {report.district || '-'}
+                    </span>
+                    <span className="flex items-center gap-1">
+                        <Icon name="calendar" className="h-3.5 w-3.5" />
+                        {formatDate(report.created_at)}
+                    </span>
+                </div>
+
+                <div className="mb-3">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/[0.12] px-2.5 py-1 text-[0.72rem] font-bold text-brown-warm">
+                        <Icon name="bolt" className="h-3 w-3" />
+                        Prioritas {Math.round(Number(report.priority_score) || 0)}
+                    </span>
+                </div>
+
                 <Link
                     to={`/laporan/${report.id}`}
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+                    className="btn-green mt-auto !rounded-lg !px-4 !py-2 text-sm"
                 >
                     Lihat Detail
-                    <span>→</span>
                 </Link>
             </div>
         </article>
     );
 }
 
-export default function PublicReports() {
-    const [search, setSearch] = useState('');
-    const [category, setCategory] = useState('Semua Kategori');
-    const [status, setStatus] = useState('Semua Status');
+function Pagination({ meta, onChange }) {
+    if (!meta || meta.last_page <= 1) return null;
 
-    const filteredReports = useMemo(() => {
-        return reports.filter((report) => {
-            const keyword = search.toLowerCase();
+    const { current_page: current, last_page: last } = meta;
 
-            const matchesSearch =
-                report.title.toLowerCase().includes(keyword) ||
-                report.description.toLowerCase().includes(keyword) ||
-                report.location.toLowerCase().includes(keyword);
+    const pages = [];
+    for (let page = 1; page <= last; page += 1) {
+        if (page === 1 || page === last || Math.abs(page - current) <= 1) {
+            pages.push(page);
+        } else if (pages[pages.length - 1] !== '…') {
+            pages.push('…');
+        }
+    }
 
-            const matchesCategory =
-                category === 'Semua Kategori' ||
-                report.category === category;
-
-            const matchesStatus =
-                status === 'Semua Status' || report.status === status;
-
-            // Laporan yang ditolak tidak ditampilkan ke publik.
-            return (
-                matchesSearch &&
-                matchesCategory &&
-                matchesStatus &&
-                report.status !== 'Ditolak'
-            );
-        });
-    }, [search, category, status]);
+    const base =
+        'flex h-9 min-w-9 items-center justify-center rounded-lg border border-cream-dark bg-white px-2 text-sm font-medium text-green-mid transition';
 
     return (
-        <div className="bg-gray-50">
-            <section className="bg-blue-700 px-4 py-14 text-white">
-                <div className="mx-auto max-w-7xl">
-                    <p className="text-sm font-medium text-blue-100">
-                        Transparansi Penanganan Pengaduan
-                    </p>
+        <nav aria-label="Navigasi halaman" className="mt-8 flex justify-center">
+            <ul className="flex items-center gap-1">
+                <li>
+                    <button
+                        type="button"
+                        disabled={current === 1}
+                        onClick={() => onChange(current - 1)}
+                        aria-label="Halaman sebelumnya"
+                        className={`${base} hover:border-green-light hover:bg-green-pale disabled:opacity-40`}
+                    >
+                        <Icon name="chevronLeft" />
+                    </button>
+                </li>
 
-                    <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
-                        Laporan Masyarakat
-                    </h1>
+                {pages.map((page, index) => (
+                    <li key={`${page}-${index}`}>
+                        {page === '…' ? (
+                            <span className="px-1 text-muted">…</span>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => onChange(page)}
+                                aria-current={page === current ? 'page' : undefined}
+                                className={`${base} ${
+                                    page === current
+                                        ? '!border-green-mid !bg-green-mid !text-white'
+                                        : 'hover:border-green-light hover:bg-green-pale'
+                                }`}
+                            >
+                                {page}
+                            </button>
+                        )}
+                    </li>
+                ))}
 
-                    <p className="mt-4 max-w-2xl leading-relaxed text-blue-100">
-                        Pantau berbagai laporan kerusakan fasilitas dan
-                        permasalahan infrastruktur publik yang disampaikan
-                        masyarakat.
-                    </p>
+                <li>
+                    <button
+                        type="button"
+                        disabled={current === last}
+                        onClick={() => onChange(current + 1)}
+                        aria-label="Halaman berikutnya"
+                        className={`${base} hover:border-green-light hover:bg-green-pale disabled:opacity-40`}
+                    >
+                        <Icon name="chevronRight" />
+                    </button>
+                </li>
+            </ul>
+        </nav>
+    );
+}
 
-                    <div className="mt-6">
-                        <span className="rounded-lg bg-white/15 px-4 py-2 text-sm">
-                            {filteredReports.length} laporan ditemukan
+export default function PublicReports() {
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const kecamatan = searchParams.get('kecamatan') ?? '';
+    const kategori = searchParams.get('kategori') ?? '';
+    const status = searchParams.get('status') ?? '';
+    const q = searchParams.get('q') ?? '';
+    const sort = searchParams.get('sort') === 'priority' ? 'priority' : 'terbaru';
+    const page = Math.max(1, Number(searchParams.get('page')) || 1);
+
+    const [searchInput, setSearchInput] = useState(q);
+    const [districtStats, setDistrictStats] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [reports, setReports] = useState([]);
+    const [meta, setMeta] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
+
+    const hasFilters = FILTER_KEYS.some((key) => searchParams.has(key));
+
+    // Jaga kolom cari tetap sinkron saat URL berubah (mis. tombol Reset / back)
+    useEffect(() => setSearchInput(q), [q]);
+
+    useEffect(() => {
+        const previous = document.title;
+        document.title = 'Semua Proyek — SIGAP';
+        return () => {
+            document.title = previous;
+        };
+    }, []);
+
+    // Data pendukung: strip kecamatan + dropdown kategori (sekali saja)
+    useEffect(() => {
+        let active = true;
+
+        reportService
+            .getDistrictStats()
+            .then((response) => active && setDistrictStats(response.data ?? []))
+            .catch(() => {});
+
+        reportService
+            .getCategories()
+            .then((data) => active && setCategories(Array.isArray(data) ? data : []))
+            .catch(() => {});
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    // Daftar laporan — dimuat ulang setiap filter/halaman berubah
+    useEffect(() => {
+        let active = true;
+        setLoading(true);
+        setError(false);
+
+        const params = { page, per_page: PER_PAGE, sort };
+        if (kecamatan) params.district = kecamatan;
+        if (kategori) params.category_id = kategori;
+        if (status) params.status = status;
+        if (q) params.search = q;
+
+        reportService
+            .getPublicReports(params)
+            .then((response) => {
+                if (!active) return;
+                setReports(response.data ?? []);
+                setMeta(response.meta ?? null);
+            })
+            .catch(() => active && setError(true))
+            .finally(() => active && setLoading(false));
+
+        return () => {
+            active = false;
+        };
+    }, [kecamatan, kategori, status, q, sort, page, reloadKey]);
+
+    const updateParams = (patch, { keepPage = false } = {}) => {
+        const next = new URLSearchParams(searchParams);
+
+        Object.entries(patch).forEach(([key, value]) => {
+            if (value) next.set(key, value);
+            else next.delete(key);
+        });
+
+        if (!keepPage) next.delete('page');
+        setSearchParams(next);
+    };
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        updateParams({ q: searchInput.trim() });
+    };
+
+    const toggleSort = () => updateParams({ sort: sort === 'priority' ? '' : 'priority' });
+
+    const total = meta?.total ?? reports.length;
+
+    return (
+        <div>
+            <PageHeader />
+            <DistrictStrip stats={districtStats} />
+
+            <div className="bg-cream pb-16 pt-2">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6">
+                    {/* ── FILTER BAR ───────────────────── */}
+                    <form
+                        onSubmit={handleSubmit}
+                        className="mb-8 rounded-[14px] border border-cream-dark bg-white p-5 shadow-card"
+                    >
+                        <div className="grid items-center gap-2.5 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.5fr)_auto_auto_auto]">
+                            <select
+                                value={kecamatan}
+                                onChange={(event) => updateParams({ kecamatan: event.target.value })}
+                                aria-label="Kecamatan"
+                                className={selectClass}
+                            >
+                                <option value="">Kecamatan</option>
+                                {districtStats.map((district) => (
+                                    <option key={district.name} value={district.name}>
+                                        {district.name}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={kategori}
+                                onChange={(event) => updateParams({ kategori: event.target.value })}
+                                aria-label="Kategori"
+                                className={selectClass}
+                            >
+                                <option value="">Kategori</option>
+                                {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                        {category.name}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={status}
+                                onChange={(event) => updateParams({ status: event.target.value })}
+                                aria-label="Status"
+                                className={selectClass}
+                            >
+                                <option value="">Semua Status</option>
+                                {STATUS_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <input
+                                type="text"
+                                value={searchInput}
+                                onChange={(event) => setSearchInput(event.target.value)}
+                                placeholder="Cari judul laporan…"
+                                aria-label="Cari judul laporan"
+                                className={selectClass}
+                            />
+
+                            <button
+                                type="button"
+                                onClick={toggleSort}
+                                aria-pressed={sort === 'priority'}
+                                title={
+                                    sort === 'priority'
+                                        ? 'Urutan: Priority Score (klik untuk terbaru)'
+                                        : 'Urutan: Terbaru (klik untuk priority)'
+                                }
+                                className={`flex h-[42px] w-[42px] items-center justify-center rounded-lg border-[1.5px] transition ${
+                                    sort === 'priority'
+                                        ? 'border-green-mid bg-green-mid/[0.07] text-green-mid'
+                                        : 'border-cream-dark bg-cream text-muted hover:border-green-light hover:text-green-mid'
+                                }`}
+                            >
+                                <Icon name="sort" />
+                            </button>
+
+                            <button type="submit" className="btn-green !px-5 !py-2.5 text-sm">
+                                <Icon name="search" />
+                                Cari
+                            </button>
+
+                            {hasFilters && (
+                                <Link
+                                    to="/laporan"
+                                    className="flex items-center gap-1 text-[0.8rem] text-muted transition hover:text-green-mid"
+                                >
+                                    <Icon name="xCircle" className="h-3.5 w-3.5" />
+                                    Reset
+                                </Link>
+                            )}
+                        </div>
+                    </form>
+
+                    {/* ── HASIL ────────────────────────── */}
+                    <div className="mb-4 flex items-center justify-between text-sm text-muted">
+                        <span>
+                            Menampilkan <strong className="text-ink">{loading ? '…' : total}</strong> laporan
+                        </span>
+                        <span className="text-[0.775rem]">
+                            Diurutkan:{' '}
+                            <strong className="text-green-mid">
+                                {sort === 'priority' ? 'Priority Score' : 'Terbaru'}
+                            </strong>
                         </span>
                     </div>
-                </div>
-            </section>
 
-            <main className="mx-auto max-w-7xl px-4 py-10">
-                <section className="mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <h2 className="mb-4 font-semibold text-gray-800">
-                        Cari dan Filter Laporan
-                    </h2>
+                    {loading ? (
+                        <Loading label="Memuat laporan..." />
+                    ) : error ? (
+                        <div className="py-20 text-center">
+                            <p className="font-bold text-green-dark">Laporan gagal dimuat</p>
+                            <p className="mt-1 text-sm text-muted">Periksa koneksi Anda lalu coba lagi.</p>
+                            <button
+                                type="button"
+                                onClick={() => setReloadKey((key) => key + 1)}
+                                className="btn-accent mt-4"
+                            >
+                                Coba lagi
+                            </button>
+                        </div>
+                    ) : reports.length === 0 ? (
+                        <div className="px-8 py-20 text-center text-muted">
+                            <Icon name="folder" className="mx-auto mb-4 h-14 w-14 opacity-35" />
+                            <h2 className="mb-2 font-bold text-green-dark">Tidak Ada Laporan Ditemukan</h2>
+                            <p>Coba ubah filter pencarian Anda.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                {reports.map((report) => (
+                                    <ProjectCard key={report.id} report={report} />
+                                ))}
+                            </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Cari judul, deskripsi, atau lokasi..."
-                            className="rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
-
-                        <select
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                            className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-                        >
-                            {categories.map((item) => (
-                                <option key={item} value={item}>
-                                    {item}
-                                </option>
-                            ))}
-                        </select>
-
-                        <select
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                            className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-                        >
-                            <option>Semua Status</option>
-                            <option>Masuk</option>
-                            <option>Diverifikasi</option>
-                            <option>Ditindaklanjuti</option>
-                            <option>Selesai</option>
-                        </select>
-                    </div>
-
-                    {(search || category !== 'Semua Kategori' || status !== 'Semua Status') && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSearch('');
-                                setCategory('Semua Kategori');
-                                setStatus('Semua Status');
-                            }}
-                            className="mt-4 text-sm font-medium text-blue-600 hover:underline"
-                        >
-                            Reset filter
-                        </button>
+                            <Pagination
+                                meta={meta}
+                                onChange={(nextPage) => {
+                                    updateParams({ page: String(nextPage) }, { keepPage: true });
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                            />
+                        </>
                     )}
-                </section>
-
-                {filteredReports.length > 0 ? (
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                        {filteredReports.map((report) => (
-                            <ReportCard key={report.id} report={report} />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
-                        <div className="text-4xl">🔍</div>
-                        <h2 className="mt-4 text-lg font-semibold text-gray-800">
-                            Laporan Tidak Ditemukan
-                        </h2>
-                        <p className="mt-2 text-sm text-gray-500">
-                            Coba gunakan kata kunci atau filter yang berbeda.
-                        </p>
-                    </div>
-                )}
-            </main>
+                </div>
+            </div>
         </div>
     );
 }

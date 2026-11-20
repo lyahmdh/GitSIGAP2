@@ -20,10 +20,18 @@ class ReportController extends Controller
         $query = Report::query()
 
             // hanya ambil field yang dibutuhkan
-            ->select('id', 'title', 'category_id', 'status')
+            ->select(
+                'id',
+                'title',
+                'category_id',
+                'status',
+                'district',
+                'priority_score',
+                'created_at'
+            )
 
-            // relasi minimal
-            ->with(['category:id,name']);
+            // relasi minimal (images dipakai untuk foto sampul kartu)
+            ->with(['category:id,name', 'images:id,report_id,image_path']);
 
         $user = auth()->user();
 
@@ -74,6 +82,25 @@ class ReportController extends Controller
                 break;
         }
 
+        // Paginasi opsional: aktif jika client mengirim page / per_page.
+        // Tanpa keduanya respons tetap seperti sebelumnya (kompatibel dengan pemanggil lama).
+        if ($request->filled('page') || $request->filled('per_page')) {
+            $paginator = $query->paginate(
+                min(max((int) $request->input('per_page', 12), 1), 50)
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $paginator->items(),
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+            ]);
+        }
+
         $reports = $query->get();
 
         return response()->json([
@@ -82,14 +109,36 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/reports/stats/districts
+     * Jumlah laporan publik per kecamatan (5 teratas) untuk strip statistik Semua Proyek.
+     */
+    public function districtStats()
+    {
+        $stats = Report::query()
+            ->where('status', '!=', 'ditolak')
+            ->selectRaw('district as name, COUNT(*) as count')
+            ->groupBy('district')
+            ->orderByDesc('count')
+            ->limit(5)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $stats
+        ]);
+    }
+
     public function show(string $id)
     {
         $report = Report::with([
-            'user',
-            'category',
-            'images',
-            'comments.user',
-            'projectUpdates.images'
+            'user:id,name,profile_photo',
+            'category:id,name',
+            'images:id,report_id,image_path',
+            'comments' => fn ($q) => $q->oldest(),
+            'comments.user:id,name,profile_photo',
+            'projectUpdates' => fn ($q) => $q->oldest(),
+            'projectUpdates.images:id,project_update_id,image_path'
         ])->find($id);
 
         if (!$report) {
