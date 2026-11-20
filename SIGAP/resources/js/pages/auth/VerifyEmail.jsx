@@ -87,36 +87,33 @@ export default function VerifyEmail() {
     }
 
     return (
-        <div className="flex min-h-[75vh] items-center justify-center px-6 py-14">
-            <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-3xl">
-                    {verified ? '✓' : '✉️'}
+        <div className="flex min-h-screen items-center justify-center bg-cream px-6 py-14">
+            <div className="w-full max-w-xl rounded-[22px] border border-cream-dark bg-white p-8 text-center shadow-float md:p-10">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-green-light to-green-dark text-3xl text-white shadow-lg shadow-green-mid/30">
+                    {verified ? '✓' : '✉'}
                 </div>
 
-                <h1 className="mt-5 text-2xl font-bold text-slate-900">
-                    {verified ? 'Email Terverifikasi' : 'Verifikasi Email'}
+                <h1 className="mt-5 font-display text-2xl font-semibold text-green-dark">
+                    {verified ? 'Email Terverifikasi' : 'Verifikasi Email Anda'}
                 </h1>
+                <div className="mx-auto mt-3 h-[3px] w-12 rounded bg-accent" />
 
-                <p className="mt-3 text-sm leading-6 text-slate-500">
+                <p className="mt-4 text-sm leading-6 text-muted">
                     {verified
                         ? 'Alamat email akun kamu sudah berhasil diverifikasi. Sekarang kamu dapat melanjutkan menggunakan SIGAP.'
-                        : 'Kami perlu memverifikasi alamat email akun kamu. Silakan periksa inbox untuk menemukan tautan verifikasi.'
-                    }
+                        : 'Kami perlu memverifikasi alamat email akun kamu. Silakan periksa inbox (atau folder spam) untuk menemukan tautan verifikasi.'}
                 </p>
 
                 {user?.email && (
-                    <p className="mt-3 font-semibold text-slate-800">
-                        {user.email}
-                    </p>
+                    <p className="mt-3 font-semibold text-green-dark">{user.email}</p>
                 )}
 
                 {message && (
                     <p
-                        className={`mt-5 rounded-lg p-3 text-sm ${
+                        className={`mt-5 rounded-xl p-3 text-sm ${
                             verified
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-slate-50 text-slate-600'
+                                ? 'bg-[#D1FAE5] text-[#065F46]'
+                                : 'bg-cream text-muted'
                         }`}
                     >
                         {message}
@@ -129,24 +126,18 @@ export default function VerifyEmail() {
                             type="button"
                             onClick={resendVerification}
                             disabled={resendLoading}
-                            className="mt-7 w-full rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="btn-green mt-7 w-full"
                         >
-                            {resendLoading
-                                ? 'Mengirim...'
-                                : 'Kirim Ulang Email'
-                            }
+                            {resendLoading ? 'Mengirim...' : 'Kirim Ulang Email Verifikasi'}
                         </button>
 
                         <button
                             type="button"
                             onClick={checkVerification}
                             disabled={checkLoading}
-                            className="mt-3 w-full rounded-lg border border-slate-300 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="btn-outline mt-3 w-full disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {checkLoading
-                                ? 'Memeriksa...'
-                                : 'Saya Sudah Verifikasi'
-                            }
+                            {checkLoading ? 'Memeriksa...' : 'Saya Sudah Verifikasi'}
                         </button>
                     </>
                 )}
@@ -155,7 +146,7 @@ export default function VerifyEmail() {
                     <button
                         type="button"
                         onClick={() => navigate('/dashboard')}
-                        className="mt-7 w-full rounded-lg bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-800"
+                        className="btn-accent mt-7 w-full"
                     >
                         Lanjut ke Dashboard
                     </button>

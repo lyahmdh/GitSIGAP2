@@ -6,7 +6,161 @@
 @source '../**/*.js';
 @source '../**/*.jsx';
 
+/*
+ * ─── TOKEN TEMA SIGAP ─────────────────────────────────────────────
+ * Nilainya diambil dari :root di resources/views/layouts/app.blade.php
+ * (tampilan Blade lama). Pakai sebagai class Tailwind, contoh:
+ *   bg-green-dark  text-accent  border-cream-dark  font-display  shadow-card
+ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-display: 'Lora', ui-serif, Georgia, serif;
+
+    --color-green-dark: #1E3A1F;
+    --color-green-mid: #2D5A2E;
+    --color-green-light: #4A7C4E;
+    --color-green-pale: #C8DEC9;
+
+    --color-brown-dark: #3D1C0B;
+    --color-brown-mid: #7B3310;
+    --color-brown-warm: #C05C1A;
+    --color-accent: #E07B3A;
+
+    --color-cream: #F5F0E8;
+    --color-cream-dark: #EDE6D6;
+
+    --color-ink: #1A1A1A;
+    --color-muted: #6B7280;
+
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.07);
+    --shadow-float: 0 6px 24px rgba(0, 0, 0, 0.1);
+    --shadow-deep: 0 16px 48px rgba(0, 0, 0, 0.14);
+
+    --animate-fade-up: fade-up 0.65s ease both;
+
+    @keyframes fade-up {
+        from {
+            opacity: 0;
+            transform: translateY(28px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}
+
+@layer base {
+    body {
+        background-color: var(--color-cream);
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+    }
+}
+
+/*
+ * ─── KOMPONEN BERSAMA ─────────────────────────────────────────────
+ * Dipakai semua halaman supaya tombol dan input seragam dengan Blade.
+ */
+@layer components {
+    .btn-green,
+    .btn-accent,
+    .btn-outline,
+    .btn-hero-outline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        border-radius: 0.5rem;
+        padding: 0.6rem 1.4rem;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .btn-green {
+        background-color: var(--color-green-mid);
+        color: #fff;
+    }
+    .btn-green:hover {
+        background-color: var(--color-green-light);
+        transform: translateY(-1px);
+    }
+    .btn-accent {
+        background-color: var(--color-accent);
+        color: #fff;
+    }
+    .btn-accent:hover {
+        background-color: var(--color-brown-warm);
+        transform: translateY(-1px);
+    }
+    .btn-outline {
+        border: 1.5px solid var(--color-cream-dark);
+        background-color: #fff;
+        color: var(--color-green-dark);
+    }
+    .btn-outline:hover {
+        background-color: var(--color-cream);
+    }
+    .btn-hero-outline {
+        border: 2px solid rgb(255 255 255 / 0.45);
+        color: #fff;
+    }
+    .btn-hero-outline:hover {
+        border-color: #fff;
+        background-color: rgb(255 255 255 / 0.1);
+    }
+    .btn-green:disabled,
+    .btn-accent:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .field-label {
+        display: block;
+        margin-bottom: 0.4rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--color-green-dark);
+    }
+    .field-input {
+        width: 100%;
+        border-radius: 0.5rem;
+        border: 1.5px solid var(--color-cream-dark);
+        background-color: #fff;
+        padding: 0.65rem 0.9rem;
+        font-size: 0.9rem;
+        color: var(--color-ink);
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field-input::placeholder {
+        color: #9ca3af;
+    }
+    .field-input:focus {
+        outline: none;
+        border-color: var(--color-green-light);
+        box-shadow: 0 0 0 3px rgb(74 124 78 / 0.18);
+    }
+
+    .card-sigap {
+        border-radius: 0.875rem;
+        border: 1px solid var(--color-cream-dark);
+        background-color: #fff;
+        box-shadow: var(--shadow-card);
+    }
+
+    .section-eyebrow {
+        font-size: 0.775rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--color-accent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
 }
