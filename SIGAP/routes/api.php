@@ -2,10 +2,12 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\ProjectUpdateController;
+use App\Http\Controllers\Api\SpaAuthController;
 
 // PUBLIC ROUTES
 Route::prefix('auth')->group(function () {
@@ -118,12 +120,18 @@ Route::prefix('admin')->middleware(['auth:api', 'admin'])->group(function () {
 // JWT endpoints di atas dipertahankan sementara untuk kompatibilitas selama migrasi.
 Route::prefix('spa')->group(function () {
     Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
-        Route::post('/register', [\App\Http\Controllers\Api\SpaAuthController::class, 'register']);
-        Route::post('/login', [\App\Http\Controllers\Api\SpaAuthController::class, 'login']);
+        Route::post('/register', [SpaAuthController::class, 'register']);
+        Route::post('/login', [SpaAuthController::class, 'login']);
     });
 
     Route::middleware('auth:sanctum')->group(function () {
-        Route::get('/auth/me', [\App\Http\Controllers\Api\SpaAuthController::class, 'me']);
-        Route::post('/auth/logout', [\App\Http\Controllers\Api\SpaAuthController::class, 'logout']);
+        Route::get('/auth/me', [SpaAuthController::class, 'me']);
+
+        Route::post('/auth/email/verification-notification', [
+            SpaAuthController::class,
+            'resendVerification',
+        ])->middleware('throttle:6,1');
+
+        Route::post('/auth/logout', [SpaAuthController::class, 'logout']);
     });
 });

@@ -7,12 +7,13 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class SpaAuthController extends Controller
 {
-    /** Register a user and establish a first-party web session. */
+    /**
+     * Register a user and establish a first-party web session.
+     */
     public function register(RegisterRequest $request)
     {
         $validated = $request->validated();
@@ -24,7 +25,7 @@ class SpaAuthController extends Controller
             'role' => 'user',
         ]);
 
-        // Kirim email verifikasi seperti registrasi Blade.
+        // Kirim email verifikasi.
         $user->sendEmailVerificationNotification();
 
         // Login otomatis menggunakan session Laravel.
@@ -34,12 +35,19 @@ class SpaAuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Registrasi berhasil. Silakan periksa email untuk verifikasi akun.',
-            'user' => $user->only(['id', 'name', 'email', 'role']),
+            'user' => $user->only([
+                'id',
+                'name',
+                'email',
+                'role',
+                'email_verified_at',
+            ]),
         ], 201);
     }
 
-
-    /** Authenticate using Laravel's session guard (Sanctum SPA flow). */
+    /**
+     * Authenticate using Laravel's session guard.
+     */
     public function login(Request $request)
     {
         $credentials = $request->validate([
@@ -47,35 +55,82 @@ class SpaAuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (!Auth::guard('web')->attempt($credentials, $request->boolean('remember'))) {
+        if (!Auth::guard('web')->attempt(
+            $credentials,
+            $request->boolean('remember')
+        )) {
             throw ValidationException::withMessages([
                 'email' => ['Email atau password salah.'],
             ]);
         }
 
         $request->session()->regenerate();
+
         $user = $request->user();
 
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil.',
-            'user' => $user->only(['id', 'name', 'email', 'role']),
+            'user' => $user->only([
+                'id',
+                'name',
+                'email',
+                'role',
+                'email_verified_at',
+            ]),
         ]);
     }
 
-    /** Return the currently authenticated SPA user. */
+    /**
+     * Return the currently authenticated SPA user.
+     */
     public function me(Request $request)
     {
+        $user = $request->user();
+
         return response()->json([
             'success' => true,
-            'user' => $request->user()->only(['id', 'name', 'email', 'role']),
+            'user' => $user->only([
+                'id',
+                'name',
+                'email',
+                'role',
+                'email_verified_at',
+            ]),
         ]);
     }
 
-    /** Invalidate the current session. */
+    /**
+     * Resend email verification notification.
+     */
+    public function resendVerification(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => true,
+                'verified' => true,
+                'message' => 'Email kamu sudah terverifikasi.',
+            ]);
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return response()->json([
+            'success' => true,
+            'verified' => false,
+            'message' => 'Email verifikasi berhasil dikirim ulang.',
+        ]);
+    }
+
+    /**
+     * Invalidate the current session.
+     */
     public function logout(Request $request)
     {
         Auth::guard('web')->logout();
+
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

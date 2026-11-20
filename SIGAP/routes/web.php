@@ -80,7 +80,7 @@ Route::middleware('auth')->group(function () {
     ) {
         $request->fulfill();
 
-        return redirect('/profile');
+        return redirect('/react/verify-email?verified=1');
     })->middleware('signed')->name('verification.verify');
 
     Route::post('/email/verification-notification', function (
@@ -186,5 +186,6 @@ Route::prefix('admin')
     });
 
 // Halaman uji migrasi React
-Route::view('/react', 'react-app')
+Route::view('/react/{path?}', 'react-app')
+    ->where('path', '.*')
     ->name('react.app');
