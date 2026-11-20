@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Comment\StoreCommentRequest;
 use App\Models\Comment;
+use App\Models\Report;
 
 class CommentController extends Controller
 {
     public function index($id)
     {
-        $comments = Comment::with('user')
+        $comments = Comment::with('user:id,name,profile_photo')
             ->where('report_id', $id)
             ->latest()
             ->get();
@@ -21,12 +22,21 @@ class CommentController extends Controller
         ]);
     }
 
-    public function store(StoreCommentRequest $request)
+    public function store(StoreCommentRequest $request, string $id)
     {
+        $report = Report::find($id);
+
+        if (!$report || $report->status === 'ditolak') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Report tidak ditemukan'
+            ], 404);
+        }
+
         $validated = $request->validated();
 
         $comment = Comment::create([
-            'report_id' => $validated['report_id'],
+            'report_id' => $report->id,
             'user_id' => auth()->id(),
             'comment' => $validated['comment']
         ]);
@@ -34,7 +44,7 @@ class CommentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Komentar berhasil ditambahkan',
-            'data' => $comment->load('user')
+            'data' => $comment->load('user:id,name,profile_photo')
         ], 201);
     }
 

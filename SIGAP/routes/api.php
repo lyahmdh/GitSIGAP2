@@ -17,6 +17,7 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::get('/reports', [ReportController::class, 'index']);
+Route::get('/reports/stats/districts', [ReportController::class, 'districtStats']);
 Route::get('/reports/{id}', [ReportController::class, 'show']);
 
 // komentar publik (lihat komentar)
@@ -133,5 +134,9 @@ Route::prefix('spa')->group(function () {
         ])->middleware('throttle:6,1');
 
         Route::post('/auth/logout', [SpaAuthController::class, 'logout']);
+
+        // Komentar dari SPA (sesi Sanctum). Versi JWT di atas tetap ada selama migrasi.
+        Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
+        Route::delete('/comments/{id}', [CommentController::class, 'destroy']);
     });
 });
