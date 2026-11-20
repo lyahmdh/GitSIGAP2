@@ -114,3 +114,16 @@ Route::prefix('admin')->middleware(['auth:api', 'admin'])->group(function () {
         ]);
     });
 });
+// FIRST-PARTY REACT SPA (Sanctum cookie/session authentication).
+// JWT endpoints di atas dipertahankan sementara untuk kompatibilitas selama migrasi.
+Route::prefix('spa')->group(function () {
+    Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
+        Route::post('/register', [\App\Http\Controllers\Api\SpaAuthController::class, 'register']);
+        Route::post('/login', [\App\Http\Controllers\Api\SpaAuthController::class, 'login']);
+    });
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/auth/me', [\App\Http\Controllers\Api\SpaAuthController::class, 'me']);
+        Route::post('/auth/logout', [\App\Http\Controllers\Api\SpaAuthController::class, 'logout']);
+    });
+});

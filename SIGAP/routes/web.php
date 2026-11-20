@@ -184,3 +184,7 @@ Route::prefix('admin')
         Route::get('/statistik', [AdminController::class, 'statistik'])
             ->name('statistik');
     });
+
+// Halaman uji migrasi React
+Route::view('/react', 'react-app')
+    ->name('react.app');

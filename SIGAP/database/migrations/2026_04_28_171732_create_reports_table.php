@@ -13,18 +13,18 @@ return new class extends Migration
 
             $table->foreignId('user_id')
                 ->constrained()
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->foreignId('category_id')
                 ->constrained()
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             $table->string('title', 150);
 
             $table->text('description');
 
             // 1 ringan, 2 sedang, 3 berat
-            $table->tinyInteger('severity');
+            $table->unsignedTinyInteger('severity');
 
             $table->boolean('is_anonymous')
                 ->default(false);
@@ -37,10 +37,10 @@ return new class extends Migration
                 'ditolak'
             ])->default('masuk');
 
-            $table->string('location_name');
+            $table->string('location_detail', 255);
 
-            $table->string('district');
-            $table->string('subdistrict');
+            $table->string('district', 100);
+            $table->string('subdistrict', 100);
 
             $table->decimal('latitude', 10, 8);
 
