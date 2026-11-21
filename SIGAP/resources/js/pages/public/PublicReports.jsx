@@ -29,11 +29,10 @@ function PageHeader() {
 
             <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
                 <h1 className="mb-1.5 font-display text-[clamp(1.8rem,4vw,2.8rem)] font-semibold text-white">
-                    Semua Proyek
+                    Semua Laporan
                 </h1>
                 <p className="text-[0.95rem] text-white/65">
-                    Daftar seluruh laporan dan proyek pembangunan fasilitas publik yang dapat diakses
-                    masyarakat.
+                    Daftar seluruh laporan fasilitas publik yang dapat diakses masyarakat.
                 </p>
             </div>
         </div>
@@ -201,7 +200,8 @@ export default function PublicReports() {
     const kategori = searchParams.get('kategori') ?? '';
     const status = searchParams.get('status') ?? '';
     const q = searchParams.get('q') ?? '';
-    const sort = searchParams.get('sort') === 'priority' ? 'priority' : 'terbaru';
+    const sortValue = searchParams.get('sort') || 'newest';
+    const sort = ['newest', 'oldest', 'priority'].includes(sortValue) ? sortValue : 'newest';
     const page = Math.max(1, Number(searchParams.get('page')) || 1);
 
     const [searchInput, setSearchInput] = useState(q);
@@ -220,7 +220,7 @@ export default function PublicReports() {
 
     useEffect(() => {
         const previous = document.title;
-        document.title = 'Semua Proyek — SIGAP';
+        document.title = 'Semua Laporan — SIGAP';
         return () => {
             document.title = previous;
         };
@@ -289,7 +289,6 @@ export default function PublicReports() {
         updateParams({ q: searchInput.trim() });
     };
 
-    const toggleSort = () => updateParams({ sort: sort === 'priority' ? '' : 'priority' });
 
     const total = meta?.total ?? reports.length;
 
@@ -357,23 +356,16 @@ export default function PublicReports() {
                                 className={selectClass}
                             />
 
-                            <button
-                                type="button"
-                                onClick={toggleSort}
-                                aria-pressed={sort === 'priority'}
-                                title={
-                                    sort === 'priority'
-                                        ? 'Urutan: Priority Score (klik untuk terbaru)'
-                                        : 'Urutan: Terbaru (klik untuk priority)'
-                                }
-                                className={`flex h-[42px] w-[42px] items-center justify-center rounded-lg border-[1.5px] transition ${
-                                    sort === 'priority'
-                                        ? 'border-green-mid bg-green-mid/[0.07] text-green-mid'
-                                        : 'border-cream-dark bg-cream text-muted hover:border-green-light hover:text-green-mid'
-                                }`}
+                            <select
+                                value={sort}
+                                onChange={(event) => updateParams({ sort: event.target.value })}
+                                aria-label="Urutkan laporan"
+                                className={`${selectClass} min-w-[165px]`}
                             >
-                                <Icon name="sort" />
-                            </button>
+                                <option value="newest">Sort by: Terbaru</option>
+                                <option value="oldest">Sort by: Terlama</option>
+                                <option value="priority">Sort by: Priority Score</option>
+                            </select>
 
                             <button type="submit" className="btn-green !px-5 !py-2.5 text-sm">
                                 <Icon name="search" />
@@ -400,7 +392,7 @@ export default function PublicReports() {
                         <span className="text-[0.775rem]">
                             Diurutkan:{' '}
                             <strong className="text-green-mid">
-                                {sort === 'priority' ? 'Priority Score' : 'Terbaru'}
+                                {sort === 'priority' ? 'Priority Score' : sort === 'oldest' ? 'Terlama' : 'Terbaru'}
                             </strong>
                         </span>
                     </div>

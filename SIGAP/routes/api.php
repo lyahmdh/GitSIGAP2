@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\ProjectUpdateController;
 use App\Http\Controllers\Api\SpaAuthController;
+use App\Http\Controllers\Api\SpaProfileController;
 
 // PUBLIC ROUTES
 Route::prefix('auth')->group(function () {
@@ -18,6 +19,7 @@ Route::prefix('auth')->group(function () {
 
 Route::get('/reports', [ReportController::class, 'index']);
 Route::get('/reports/stats/districts', [ReportController::class, 'districtStats']);
+Route::get('/reports/map-points', [ReportController::class, 'mapPoints']);
 Route::get('/reports/{id}', [ReportController::class, 'show']);
 
 // komentar publik (lihat komentar)
@@ -127,6 +129,10 @@ Route::prefix('spa')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [SpaAuthController::class, 'me']);
+        Route::get('/profile', [SpaProfileController::class, 'show']);
+        Route::post('/reports', [ReportController::class, 'store']);
+        Route::put('/profile', [SpaProfileController::class, 'update']);
+        Route::delete('/profile/photo', [SpaProfileController::class, 'destroyPhoto']);
 
         Route::post('/auth/email/verification-notification', [
             SpaAuthController::class,

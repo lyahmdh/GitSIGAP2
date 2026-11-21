@@ -32,7 +32,7 @@ export default function AdminReportDetail() {
     const [updateTitle, setUpdateTitle] = useState('');
     const [updateDescription, setUpdateDescription] = useState('');
     const [updates, setUpdates] = useState([
-        { id: 1, title: 'Pemeriksaan lokasi', description: 'Tim telah melakukan pemeriksaan awal pada lokasi laporan dan mendata kebutuhan perbaikan.', date: '21 November 2026', photos: [] },
+        { id: 1, title: 'Pemeriksaan lokasi', description: 'Tim telah melakukan pemeriksaan awal pada lokasi laporan dan mendata kebutuhan perbaikan.', date: '21 November 2026', created_at: '2026-11-21T08:00:00.000Z', photos: [] },
     ]);
     const [notice, setNotice] = useState('');
 
@@ -51,7 +51,7 @@ export default function AdminReportDetail() {
         const title = updateTitle.trim();
         const description = updateDescription.trim();
         if (!title || !description) return;
-        setUpdates((current) => [{ id: Date.now(), title, description, date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), photos: [] }, ...current]);
+        setUpdates((current) => [...current, { id: Date.now(), title, description, date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }), created_at: new Date().toISOString(), photos: [] }].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
         setUpdateTitle('');
         setUpdateDescription('');
         setNotice('Update proyek berhasil ditambahkan. (Pratinjau)');
@@ -129,7 +129,7 @@ export default function AdminReportDetail() {
                         </form>
                         <div className="my-6 border-t border-cream-dark" />
                         {updates.length ? <div className="relative space-y-6 before:absolute before:bottom-2 before:left-[9px] before:top-2 before:w-px before:bg-cream-dark">
-                            {updates.map((update) => <article key={update.id} className="relative flex gap-4">
+                            {[...updates].sort((a, b) => new Date(a.created_at || a.date) - new Date(b.created_at || b.date)).map((update) => <article key={update.id} className="relative flex gap-4">
                                 <span className="relative z-10 mt-1 h-5 w-5 shrink-0 rounded-full border-4 border-green-pale bg-green-mid" />
                                 <div className="min-w-0 flex-1"><p className="text-xs text-muted">{update.date}</p><h3 className="mt-1 font-bold">{update.title}</h3><p className="mt-1 text-sm leading-6 text-muted">{update.description}</p></div>
                             </article>)}

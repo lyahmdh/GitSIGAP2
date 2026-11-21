@@ -7,6 +7,7 @@ use App\Http\Requests\Report\StoreReportRequest;
 use App\Models\Category;
 use App\Models\Report;
 use App\Models\ReportImage;
+use App\Models\District;
 use App\Mail\ReportStatusUpdatedMail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -111,22 +112,34 @@ class ReportController extends Controller
 
     /**
      * GET /api/reports/stats/districts
-     * Jumlah laporan publik per kecamatan (5 teratas) untuk strip statistik Semua Proyek.
+     * Jumlah laporan publik untuk seluruh kecamatan pada tabel districts.
      */
     public function districtStats()
     {
-        $stats = Report::query()
-            ->where('status', '!=', 'ditolak')
-            ->selectRaw('district as name, COUNT(*) as count')
-            ->groupBy('district')
+        $stats = District::query()
+            ->withCount(['reports as count' => function ($query) {
+                $query->where('status', '!=', 'ditolak');
+            }])
             ->orderByDesc('count')
-            ->limit(5)
-            ->get();
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return response()->json([
             'success' => true,
             'data' => $stats
         ]);
+    }
+
+    /** GET /api/reports/map-points — titik laporan publik untuk heat layer peta. */
+    public function mapPoints()
+    {
+        $points = Report::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->where('status', '!=', 'ditolak')
+            ->get(['id', 'title', 'latitude', 'longitude', 'status', 'district', 'created_at']);
+
+        return response()->json(['success' => true, 'data' => $points]);
     }
 
     public function show(string $id)
@@ -246,9 +259,9 @@ class ReportController extends Controller
                 'severity' => $validated['severity'],
                 'is_anonymous' => $validated['is_anonymous'],
                 'status' => 'masuk',
-                'location_name' => $validated['location_name'],
+                'location_detail' => $validated['location_detail'],
+                'district_id' => $validated['district_id'],
                 'district' => $validated['district'],
-                'subdistrict' => $validated['subdistrict'],
                 'latitude' => $validated['latitude'],
                 'longitude' => $validated['longitude'],
                 'priority_score' => round($priorityScore, 2)

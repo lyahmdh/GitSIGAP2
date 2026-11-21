@@ -3,7 +3,7 @@ import api from './api';
 const reportService = {
     /**
      * Daftar laporan publik.
-     * Param: search, status, category_id, district, sort (terbaru|priority|oldest), page, per_page
+     * Param: search, status, category_id, district, sort (newest|oldest|priority), page, per_page
      * Jika page/per_page dikirim, respons menyertakan `meta` (paginasi).
      */
     async getPublicReports(params = {}) {

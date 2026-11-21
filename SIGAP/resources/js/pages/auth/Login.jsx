@@ -20,7 +20,7 @@ export default function Login() {
 
         try {
             const result = await login(form);
-            navigate(result.user.role === 'admin' ? '/admin' : '/dashboard');
+            navigate(result.user.role === 'admin' ? '/admin' : '/profile');
         } catch (err) {
             const validationErrors = err.response?.data?.errors;
 

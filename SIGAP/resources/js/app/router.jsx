@@ -18,12 +18,9 @@ import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import VerifyEmail from '../pages/auth/VerifyEmail';
 
-import Dashboard from '../pages/user/Dashboard';
-import Reports from '../pages/user/Reports';
 import CreateReport from '../pages/user/CreateReport';
 import ReportDetail from '../pages/user/ReportDetail';
 import Profile from '../pages/user/Profile';
-import MapReports from '../pages/user/MapReports';
 
 import AdminDashboard from '../pages/admin/Dashboard';
 import AdminReports from '../pages/admin/Reports';
@@ -58,7 +55,7 @@ function RequireAdmin() {
     if (!user) return <Navigate to="/login" replace />;
 
     if (user.role !== 'admin') {
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/profile" replace />;
     }
 
     return <Outlet />;
@@ -72,7 +69,7 @@ function GuestOnly() {
     if (user) {
         return (
             <Navigate
-                to={user.role === 'admin' ? '/admin' : '/dashboard'}
+                to={user.role === 'admin' ? '/admin' : '/profile'}
                 replace
             />
         );
@@ -108,12 +105,9 @@ const router = createBrowserRouter(
                 {
                     element: <UserLayout />,
                     children: [
-                        { path: '/dashboard', element: <Dashboard /> },
-                        { path: '/reports', element: <Reports /> },
                         { path: '/reports/create', element: <CreateReport /> },
                         { path: '/reports/:id', element: <ReportDetail /> },
                         { path: '/profile', element: <Profile /> },
-                        { path: '/map', element: <MapReports /> },
                     ],
                 },
             ],
