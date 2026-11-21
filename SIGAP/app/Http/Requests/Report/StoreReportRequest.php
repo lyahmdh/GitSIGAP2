@@ -26,7 +26,8 @@ class StoreReportRequest extends FormRequest
 
             'location_detail' => 'required|string|max:70',
 
-            'district' => 'nullable|string|max:100',
+            'district_id' => 'required|integer|exists:districts,id',
+            'district' => 'required|string|max:100',
 
             'latitude' => [
                 'required',
@@ -59,7 +60,7 @@ class StoreReportRequest extends FormRequest
     protected function prepareForValidation()
     {
         $this->merge([
-            'is_anonymous' => $this->has('is_anonymous'),
+            'is_anonymous' => $this->boolean('is_anonymous'),
         ]);
     }
 }

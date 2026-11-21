@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import api from '../../services/api';
+import api, { initializeCsrf } from '../../services/api';
+import { booleanPointInPolygon, point } from '@turf/turf';
+import districtGeoJson from '../../data/kecamatan_kota_malang.json';
 
 const markerDefault = L.icon({
     iconUrl: markerIcon,
@@ -19,20 +21,27 @@ const markerDefault = L.icon({
 const DEFAULT_CENTER = [-7.9666, 112.6326];
 const inputClass = 'mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100';
 
-function getDistrict(lat, lng) {
-    if (lat < -7.98 && lng > 112.65) return 'Kedungkandang';
-    if (lat < -7.93 && lng < 112.62) return 'Lowokwaru';
-    if (lat >= -7.97 && lat <= -7.95 && lng >= 112.60 && lng <= 112.65) return 'Klojen';
-    if (lat >= -7.93 && lng > 112.62) return 'Blimbing';
-    return 'Sukun';
+function findDistrict(lat, lng) {
+    const locationPoint = point([Number(lng), Number(lat)]);
+    const feature = districtGeoJson.features.find((item) =>
+        booleanPointInPolygon(locationPoint, item),
+    );
+    return feature?.properties?.NAME_3 || null;
 }
 
 export default function CreateReport() {
+    const navigate = useNavigate();
     const mapElement = useRef(null);
     const mapRef = useRef(null);
     const markerRef = useRef(null);
     const fileInput = useRef(null);
     const [categories, setCategories] = useState([]);
+    const [districts, setDistricts] = useState([]);
+    const districtsRef = useRef([]);
+    districtsRef.current = districts;
+    const [mapReports, setMapReports] = useState([]);
+    const [submitError, setSubmitError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
     const [categoryError, setCategoryError] = useState('');
     const [coordinates, setCoordinates] = useState(null);
     const [images, setImages] = useState([]);
@@ -51,15 +60,53 @@ export default function CreateReport() {
         api.get('/api/categories')
             .then(({ data }) => { if (active) setCategories(Array.isArray(data) ? data : data.data || []); })
             .catch(() => { if (active) setCategoryError('Kategori gagal dimuat. Muat ulang halaman atau coba lagi.'); });
+        api.get('/api/reports/stats/districts')
+            .then(({ data }) => { if (active) setDistricts(data.data || []); })
+            .catch(() => {});
         return () => { active = false; };
     }, []);
 
     useEffect(() => {
         if (!mapElement.current || mapRef.current) return undefined;
+        let active = true;
         const map = L.map(mapElement.current, { scrollWheelZoom: false }).setView(DEFAULT_CENTER, 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors',
         }).addTo(map);
+        L.geoJSON(districtGeoJson, {
+            style: { color: '#166534', weight: 2, opacity: 0.65, fillColor: '#86efac', fillOpacity: 0.035 },
+            onEachFeature: (feature, layer) => {
+                layer.bindTooltip(feature.properties?.NAME_3 || 'Kecamatan', { sticky: true });
+            },
+        }).addTo(map);
+        // Laporan terdahulu ditampilkan sebagai titik pada peta agar pelapor dapat
+        // melihat sebaran laporan sebelum menentukan lokasi baru.
+        api.get('/api/reports/map-points').then(({ data }) => {
+            if (!active) return;
+            setMapReports(data.data || []);
+            (data.data || []).forEach((report) => {
+                const lat = Number(report.latitude);
+                const lng = Number(report.longitude);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+                const dot = L.circleMarker([lat, lng], {
+                    radius: 7,
+                    color: '#7c2d12',
+                    weight: 1.5,
+                    fillColor: '#f97316',
+                    fillOpacity: 0.55,
+                }).addTo(map);
+                const popup = document.createElement('div');
+                const title = document.createElement('strong');
+                title.textContent = report.title || 'Laporan';
+                const district = document.createElement('div');
+                district.textContent = report.district || '';
+                const status = document.createElement('small');
+                status.textContent = report.status || '';
+                popup.append(title, district, status);
+                dot.bindPopup(popup);
+            });
+        }).catch(() => {});
+
         const marker = L.marker(DEFAULT_CENTER, { draggable: true, icon: markerDefault }).addTo(map);
         map.on('click', (event) => setLocation(event.latlng.lat, event.latlng.lng));
         marker.on('dragend', () => {
@@ -70,6 +117,7 @@ export default function CreateReport() {
         markerRef.current = marker;
         const timer = window.setTimeout(() => map.invalidateSize(), 100);
         return () => {
+            active = false;
             window.clearTimeout(timer);
             map.remove();
             mapRef.current = null;
@@ -78,8 +126,16 @@ export default function CreateReport() {
     }, []);
 
     function setLocation(lat, lng) {
-        const district = getDistrict(lat, lng);
-        setCoordinates({ latitude: lat.toFixed(8), longitude: lng.toFixed(8), district });
+        const district = findDistrict(lat, lng);
+        const districtRecord = districtsRef.current.find((item) =>
+            String(item.name).toLowerCase() === String(district || '').toLowerCase(),
+        );
+        setCoordinates({
+            latitude: lat.toFixed(8),
+            longitude: lng.toFixed(8),
+            district: district || '',
+            district_id: districtRecord?.id || '',
+        });
         markerRef.current?.setLatLng([lat, lng]);
     }
 
@@ -128,34 +184,49 @@ export default function CreateReport() {
         if (fileInput.current) fileInput.current.files = transfer.files;
     }
 
-    function handleSubmit(event) {
-        if (!coordinates) {
-            event.preventDefault();
-            window.alert('Harap pilih lokasi pada peta terlebih dahulu.');
+    async function handleSubmit(event) {
+        event.preventDefault();
+        setSubmitError('');
+        if (!coordinates || !coordinates.district_id) {
+            setSubmitError('Pilih titik yang berada di dalam wilayah Kota Malang pada peta. Kecamatan akan ditentukan otomatis dari GeoJSON.');
             return;
         }
         if (images.length < 1) {
-            event.preventDefault();
             setImageError('Harap unggah minimal 1 foto bukti.');
             return;
         }
-        const button = event.currentTarget.querySelector('button[type="submit"]');
-        if (button) {
-            button.disabled = true;
-            button.textContent = 'Mengirim laporan…';
+        const form = event.currentTarget;
+        const formData = new FormData(form);
+        formData.delete('images[]');
+        images.forEach((file) => formData.append('images[]', file));
+        formData.set('district', coordinates.district);
+        formData.set('district_id', String(coordinates.district_id));
+        formData.set('latitude', coordinates.latitude);
+        formData.set('longitude', coordinates.longitude);
+        formData.set('is_anonymous', form.elements.is_anonymous.checked ? '1' : '0');
+
+        try {
+            setSubmitting(true);
+            await initializeCsrf();
+            const { data } = await api.post('/api/spa/reports', formData);
+            navigate(`/profile`, { state: { successMessage: data.message || 'Laporan berhasil dikirim.' } });
+        } catch (error) {
+            const validation = error.response?.data?.errors;
+            const firstError = validation ? Object.values(validation).flat()[0] : null;
+            setSubmitError(firstError || error.response?.data?.message || 'Laporan gagal dikirim. Silakan coba lagi.');
+            setSubmitting(false);
         }
     }
 
     return (
         <div className="mx-auto max-w-4xl pb-10">
             <div className="mb-7 text-center">
-                <Link to="/dashboard" className="text-sm font-semibold text-emerald-700 hover:underline">← Kembali ke Dashboard</Link>
+                <Link to="/profile" className="text-sm font-semibold text-emerald-700 hover:underline">← Kembali ke Profil</Link>
                 <h1 className="mt-4 text-3xl font-bold text-slate-900">Buat Laporan</h1>
                 <p className="mt-2 text-sm text-slate-500">Sampaikan permasalahan fasilitas publik agar dapat segera ditindaklanjuti.</p>
             </div>
 
-            <form action="/lapor" method="POST" encType="multipart/form-data" onSubmit={handleSubmit} className="space-y-6">
-                <input type="hidden" name="_token" value={document.querySelector('meta[name="csrf-token"]')?.content || ''} />
+            <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-6">
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="bg-gradient-to-r from-amber-950 to-amber-800 px-6 py-4 text-white">
                         <h2 className="font-bold">Sampaikan Laporan Anda</h2>
@@ -187,10 +258,12 @@ export default function CreateReport() {
                                     {locating ? 'Mencari lokasi…' : '◎ Gunakan Lokasi Saat Ini'}
                                 </button>
                             </div>
-                            {coordinates && <p className="mt-2 text-xs text-slate-500">📍 {coordinates.latitude}, {coordinates.longitude} — Kecamatan {coordinates.district}</p>}
+                            {coordinates && <p className="mt-2 text-xs text-slate-500">📍 {coordinates.latitude}, {coordinates.longitude} — {coordinates.district ? `Kecamatan ${coordinates.district}` : 'Titik berada di luar batas kecamatan Kota Malang'}</p>}
+                            <p className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Titik laporan terdahulu ({mapReports.length})</span><span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full border-2 border-blue-700 bg-blue-500" /> Lokasi laporan baru</span></p>
                             <input type="hidden" name="latitude" value={coordinates?.latitude || ''} />
                             <input type="hidden" name="longitude" value={coordinates?.longitude || ''} />
                             <input type="hidden" name="district" value={coordinates?.district || ''} />
+                            <input type="hidden" name="district_id" value={coordinates?.district_id || ''} />
                         </div>
                         <div>
                             <label htmlFor="location_detail" className="text-sm font-semibold text-slate-700">Detail Lokasi <span className="text-red-500">*</span></label>
@@ -213,7 +286,7 @@ export default function CreateReport() {
                 </section>
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="font-bold text-slate-900">Bukti Pendukung</h2>
+                    <h2 className="font-bold text-slate-900">Bukti Pendukung<span className="text-red-500">*</span></h2>
                     <p className="mt-1 text-sm text-slate-500">Unggah 1–5 foto bukti dengan format JPG atau PNG. Ukuran maksimal 2 MB per foto.</p>
                     <label className="mt-4 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-5 text-center hover:bg-emerald-50">
                         <span className="text-3xl text-emerald-700">＋</span>
@@ -232,6 +305,8 @@ export default function CreateReport() {
                     </div>}
                 </section>
 
+                {submitError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{submitError}</p>}
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <label className="flex cursor-pointer items-start gap-3">
                         <input type="checkbox" name="is_anonymous" value="1" className="mt-1 h-4 w-4 accent-emerald-700" />
@@ -240,8 +315,8 @@ export default function CreateReport() {
                 </section>
 
                 <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-                    <Link to="/dashboard" className="rounded-xl border border-slate-300 px-6 py-3 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</Link>
-                    <button type="submit" className="rounded-xl bg-emerald-700 px-7 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800">Kirim Laporan</button>
+                    <Link to="/profile" className="rounded-xl border border-slate-300 px-6 py-3 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</Link>
+                    <button type="submit" disabled={submitting} className="rounded-xl bg-emerald-700 px-7 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Mengirim laporan…' : 'Kirim Laporan'}</button>
                 </div>
             </form>
         </div>
