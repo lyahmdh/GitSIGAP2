@@ -34,19 +34,30 @@ class ReportController extends Controller
             // relasi minimal (images dipakai untuk foto sampul kartu)
             ->with(['category:id,name', 'images:id,report_id,image_path']);
 
-        $user = auth()->user();
+        $user = $request->user();
 
-        // Riwayat Laporan
-        if ($request->boolean('mine') && $user) {
+        // Riwayat laporan hanya dapat diminta oleh pengguna yang sudah login.
+        if ($request->boolean('mine')) {
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Silakan login untuk melihat riwayat laporan',
+                ], 401);
+            }
+
             $query->where('user_id', $user->id);
         }
 
-        // HIDE DITOLAK (publik)
-        if (
-            !$request->boolean('include_rejected') &&
-            !($user && $user->role === 'admin') &&
-            !$request->boolean('mine')
-        ) {
+        // Laporan ditolak hanya boleh disertakan dalam hasil untuk admin.
+        if ($request->boolean('include_rejected') && (!$user || $user->role !== 'admin')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses untuk melihat laporan ditolak',
+            ], 403);
+        }
+
+        // Pengguna publik dan non-admin hanya dapat melihat laporan yang tidak ditolak.
+        if (!$user || $user->role !== 'admin') {
             $query->where('status', '!=', 'ditolak');
         }
 
