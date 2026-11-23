@@ -1,24 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Chart, DoughnutController, ArcElement, Tooltip, Legend } from 'chart.js';
+import reportService from '../../services/reportService';
 
 Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
-
-const stats = {
-    total: 248,
-    masuk: 32,
-    diverifikasi: 42,
-    ditindaklanjuti: 46,
-    selesai: 128,
-    ditolak: 0,
-};
-
-const recentReports = [
-    { id: 1, title: 'Jalan berlubang di Lowokwaru', date: '20/11/2026', category: 'Jalan & Transportasi', priority: 86, status: 'masuk' },
-    { id: 2, title: 'Lampu jalan tidak menyala', date: '19/11/2026', category: 'Penerangan Umum', priority: 65, status: 'diverifikasi' },
-    { id: 3, title: 'Saluran air tersumbat', date: '18/11/2026', category: 'Air & Drainase', priority: 48, status: 'ditindaklanjuti' },
-    { id: 4, title: 'Kerusakan fasilitas taman', date: '17/11/2026', category: 'Ruang Publik', priority: 32, status: 'selesai' },
-];
 
 const chartColors = ['#D6A15D', '#8B6B45', '#6B8F71', '#294B32', '#B85C4A'];
 const chartLabels = ['Masuk', 'Diverifikasi', 'Ditindaklanjuti', 'Selesai', 'Ditolak'];
@@ -30,28 +15,137 @@ const statusStyles = {
     selesai: 'bg-green-100 text-green-800',
     ditolak: 'bg-red-100 text-red-800',
 };
-const formatStatus = (status) => status === 'ditindaklanjuti' ? 'Ditindaklanjuti' : status.charAt(0).toUpperCase() + status.slice(1);
+
+function statusCounts(rows = []) {
+    const counts = Object.fromEntries(statusKeys.map((key) => [key, 0]));
+
+    if (Array.isArray(rows)) {
+        rows.forEach((item) => {
+            if (item?.status in counts) counts[item.status] = Number(item.total) || 0;
+        });
+    } else if (rows && typeof rows === 'object') {
+        statusKeys.forEach((key) => {
+            counts[key] = Number(rows[key]) || 0;
+        });
+    }
+
+    return counts;
+}
+
+function formatDate(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    });
+}
+
+function formatStatus(status = '') {
+    return status === 'ditindaklanjuti'
+        ? 'Ditindaklanjuti'
+        : status.charAt(0).toUpperCase() + status.slice(1);
+}
 
 function Priority({ value }) {
-    const style = value >= 70 ? 'bg-red-50 text-red-700' : value >= 40 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700';
-    return <span className={`inline-flex min-w-10 justify-center rounded-md px-2 py-1 text-xs font-bold ${style}`}>{value}</span>;
+    const score = Number(value) || 0;
+    const style = score >= 70
+        ? 'bg-red-50 text-red-700'
+        : score >= 40
+            ? 'bg-amber-50 text-amber-700'
+            : 'bg-green-50 text-green-700';
+
+    return (
+        <span className={`inline-flex min-w-10 justify-center rounded-md px-2 py-1 text-xs font-bold ${style}`}>
+            {score.toFixed(0)}
+        </span>
+    );
 }
 
 export default function AdminDashboard() {
     const canvasRef = useRef(null);
+    const chartRef = useRef(null);
+    const [stats, setStats] = useState({ total: 0, ...statusCounts() });
+    const [recentReports, setRecentReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        let active = true;
+
+        const loadDashboard = async () => {
+            setLoading(true);
+            setError('');
+
+            try {
+                const [statisticsResponse, reportsResponse] = await Promise.all([
+                    reportService.getAdminStatistics(),
+                    reportService.getAdminReports({ page: 1, per_page: 5, sort: 'newest' }),
+                ]);
+
+                if (!active) return;
+
+                const statistics = statisticsResponse?.data ?? statisticsResponse ?? {};
+                const counts = statusCounts(statistics.by_status);
+                setStats({
+                    total: Number(statistics.total_reports) || 0,
+                    ...counts,
+                });
+                setRecentReports(Array.isArray(reportsResponse?.data) ? reportsResponse.data : []);
+            } catch (requestError) {
+                if (active) {
+                    setError(requestError.response?.data?.message || 'Data dashboard gagal dimuat. Periksa koneksi dan autentikasi admin.');
+                }
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+
+        loadDashboard();
+        return () => { active = false; };
+    }, []);
 
     useEffect(() => {
         if (!canvasRef.current) return undefined;
-        const chart = new Chart(canvasRef.current, {
+
+        if (chartRef.current) {
+            chartRef.current.destroy();
+        }
+
+        chartRef.current = new Chart(canvasRef.current, {
             type: 'doughnut',
             data: {
                 labels: chartLabels,
-                datasets: [{ data: statusKeys.map((key) => stats[key]), backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff', hoverOffset: 5 }],
+                datasets: [{
+                    data: statusKeys.map((key) => stats[key]),
+                    backgroundColor: chartColors,
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                    hoverOffset: 5,
+                }],
             },
-            options: { responsive: true, maintainAspectRatio: false, cutout: '66%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => ` ${context.label}: ${context.raw}` } } } },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '66%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => ` ${context.label}: ${context.raw}`,
+                        },
+                    },
+                },
+            },
         });
-        return () => chart.destroy();
-    }, []);
+
+        return () => {
+            chartRef.current?.destroy();
+            chartRef.current = null;
+        };
+    }, [stats]);
 
     const activeProjects = stats.diverifikasi + stats.ditindaklanjuti;
     const cards = [
@@ -68,13 +162,15 @@ export default function AdminDashboard() {
                 <p className="mt-1 text-sm text-muted">Ringkasan pengelolaan laporan masyarakat.</p>
             </header>
 
+            {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {cards.map((card, index) => (
                     <article key={card.label} className="flex gap-4 rounded-xl border border-cream-dark bg-white p-5 shadow-sm">
                         <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-xl font-bold ${index === 0 ? 'bg-green-pale text-green-mid' : index === 1 ? 'bg-orange-50 text-accent' : 'bg-green-50 text-green-dark'}`}>{card.icon}</div>
                         <div>
                             <p className="text-xs font-bold uppercase tracking-wider text-muted">{card.label}</p>
-                            <p className="mt-1 font-display text-3xl font-semibold leading-tight">{card.value}</p>
+                            <p className="mt-1 font-display text-3xl font-semibold leading-tight">{loading ? '—' : card.value}</p>
                             <p className="mt-1 text-xs text-muted">{card.detail}</p>
                         </div>
                     </article>
@@ -89,12 +185,14 @@ export default function AdminDashboard() {
                         {statusKeys.map((key, index) => {
                             const count = stats[key];
                             const percentage = stats.total ? Math.round((count / stats.total) * 100) : 0;
-                            return <div key={key} className="flex items-center gap-3 text-sm">
-                                <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index] }} />
-                                <span className="text-muted">{chartLabels[index]}</span>
-                                <span className="ml-auto font-bold">{percentage}%</span>
-                                <span className="w-9 text-right text-xs text-muted">{count}</span>
-                            </div>;
+                            return (
+                                <div key={key} className="flex items-center gap-3 text-sm">
+                                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index] }} />
+                                    <span className="text-muted">{chartLabels[index]}</span>
+                                    <span className="ml-auto font-bold">{percentage}%</span>
+                                    <span className="w-9 text-right text-xs text-muted">{count}</span>
+                                </div>
+                            );
                         })}
                     </div>
                 </div>
@@ -107,18 +205,26 @@ export default function AdminDashboard() {
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[850px] text-left text-sm">
-                        <thead className="bg-green-dark text-xs uppercase tracking-wider text-white"><tr>
-                            {['ID', 'Judul', 'Tanggal Laporan', 'Kategori', 'Priority Score', 'Status', 'Aksi'].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}
-                        </tr></thead>
-                        <tbody>{recentReports.map((report) => <tr key={report.id} className="border-b border-cream-dark last:border-0 hover:bg-cream/70">
-                            <td className="px-4 py-4 font-semibold text-muted">#{String(report.id).padStart(3, '0')}</td>
-                            <td className="px-4 py-4 font-semibold">{report.title}</td>
-                            <td className="px-4 py-4 text-muted">{report.date}</td>
-                            <td className="px-4 py-4 text-muted">{report.category}</td>
-                            <td className="px-4 py-4"><Priority value={report.priority} /></td>
-                            <td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[report.status]}`}>{formatStatus(report.status)}</span></td>
-                            <td className="px-4 py-4"><Link to={`/admin/reports/${report.id}`} className="font-bold text-green-mid hover:underline">Detail</Link></td>
-                        </tr>)}</tbody>
+                        <thead className="bg-green-dark text-xs uppercase tracking-wider text-white">
+                            <tr>{['ID', 'Judul', 'Tanggal Laporan', 'Kategori', 'Priority Score', 'Status', 'Aksi'].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                            {recentReports.map((report) => (
+                                <tr key={report.id} className="border-b border-cream-dark last:border-0 hover:bg-cream/70">
+                                    <td className="px-4 py-4 font-semibold text-muted">#{report.id}</td>
+                                    <td className="px-4 py-4 font-semibold">{report.title}</td>
+                                    <td className="px-4 py-4 text-muted">{formatDate(report.created_at)}</td>
+                                    <td className="px-4 py-4 text-muted">{report.category?.name || '-'}</td>
+                                    <td className="px-4 py-4"><Priority value={report.priority_score} /></td>
+                                    <td className="px-4 py-4"><span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[report.status] || 'bg-gray-100 text-gray-700'}`}>{formatStatus(report.status)}</span></td>
+                                    <td className="px-4 py-4"><Link to={`/admin/reports/${report.id}`} className="font-bold text-green-mid hover:underline">Detail</Link></td>
+                                </tr>
+                            ))}
+                            {!loading && recentReports.length === 0 && (
+                                <tr><td colSpan="7" className="px-4 py-10 text-center text-sm text-muted">Belum ada laporan.</td></tr>
+                            )}
+                            {loading && <tr><td colSpan="7" className="px-4 py-10 text-center text-sm text-muted">Memuat data laporan...</td></tr>}
+                        </tbody>
                     </table>
                 </div>
             </section>

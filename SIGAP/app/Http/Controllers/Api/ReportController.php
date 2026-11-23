@@ -184,6 +184,47 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/spa/admin/reports/{id}
+     * Detail laporan untuk admin. Berbeda dari show() publik, method ini
+     * tetap mengizinkan laporan berstatus ditolak untuk ditinjau admin.
+     */
+    public function adminShow(string $id)
+    {
+        $report = Report::with([
+            'user:id,name,email,profile_photo',
+            'category:id,name',
+            'districtRecord:id,name',
+            'images:id,report_id,image_path',
+            'comments' => fn ($query) => $query->oldest(),
+            'comments.user:id,name,profile_photo',
+            'projectUpdates' => fn ($query) => $query->oldest(),
+            'projectUpdates.images:id,project_update_id,image_path',
+        ])->find($id);
+
+        if (!$report) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Laporan tidak ditemukan',
+            ], 404);
+        }
+
+        // Hormati pengaturan laporan anonim pada tampilan detail admin.
+        if ($report->is_anonymous && $report->user) {
+            $report->user->name = 'Anonim';
+        }
+
+        $report->formatted_address = collect([
+            $report->location_detail,
+            $report->districtRecord?->name ?? $report->district,
+        ])->filter()->implode(', ');
+
+        return response()->json([
+            'success' => true,
+            'data' => $report,
+        ]);
+    }
+
     public function store(StoreReportRequest $request)
     {
         $validated = $request->validated();
@@ -342,62 +383,112 @@ class ReportController extends Controller
 
     public function updateStatus(Request $request, string $id)
     {
-        $report = Report::find($id);
+        // Route ini juga dilindungi middleware admin, tetapi pemeriksaan ini
+        // dipertahankan sebagai lapisan keamanan tambahan.
+        $user = $request->user();
 
-        if (!$report) {
+        if (!$user || $user->role !== 'admin') {
             return response()->json([
                 'success' => false,
-                'message' => 'Report tidak ditemukan'
-            ], 404);
-        }
-
-        // hanya admin
-        if (auth()->user()->role !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized'
+                'message' => 'Unauthorized',
             ], 403);
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'status' => [
                 'required',
-                'in:diverifikasi,ditindaklanjuti,selesai,ditolak'
-            ]
+                'string',
+                'in:diverifikasi,ditindaklanjuti,selesai,ditolak',
+            ],
+            'note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        // Status flow (tidak boleh mundur)
+        // Transisi status mengikuti alur penanganan yang sudah ditetapkan.
+        // Status final (selesai/ditolak) tidak dapat diubah kembali.
         $allowedTransitions = [
             'masuk' => ['diverifikasi', 'ditolak'],
             'diverifikasi' => ['ditindaklanjuti', 'ditolak'],
             'ditindaklanjuti' => ['selesai'],
             'selesai' => [],
-            'ditolak' => []
+            'ditolak' => [],
         ];
 
-        if (!in_array($request->status, $allowedTransitions[$report->status])) {
+        // Kunci baris laporan selama proses agar dua permintaan bersamaan
+        // tidak dapat melewati pemeriksaan transisi berdasarkan status lama.
+        $result = DB::transaction(function () use ($id, $validated, $user, $allowedTransitions) {
+            $report = Report::query()
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$report) {
+                return [
+                    'error' => 'Report tidak ditemukan',
+                    'http_status' => 404,
+                ];
+            }
+
+            $previousStatus = (string) $report->status;
+            $nextStatus = $validated['status'];
+            $possibleNextStatuses = $allowedTransitions[$previousStatus] ?? [];
+
+            if (!in_array($nextStatus, $possibleNextStatuses, true)) {
+                return [
+                    'error' => "Transisi status dari '{$previousStatus}' ke '{$nextStatus}' tidak valid",
+                    'http_status' => 422,
+                ];
+            }
+
+            $report->status = $nextStatus;
+            $report->save();
+
+            // Simpan jejak perubahan status ke tabel yang sudah disediakan
+            // oleh migration create_report_status_histories_table.
+            DB::table('report_status_histories')->insert([
+                'report_id' => $report->id,
+                'actor_id' => $user->id,
+                'from_status' => $previousStatus,
+                'to_status' => $nextStatus,
+                'note' => $validated['note'] ?? null,
+                'is_system' => false,
+                'created_at' => now(),
+            ]);
+
+            return [
+                'report' => $report->fresh()->load('user'),
+                'previous_status' => $previousStatus,
+            ];
+        });
+
+        if (isset($result['error'])) {
             return response()->json([
                 'success' => false,
-                'message' => 'Transisi status tidak valid'
-            ], 422);
+                'message' => $result['error'],
+            ], $result['http_status']);
         }
 
-        $report->update([
-            'status' => $request->status
-        ]);
+        $report = $result['report'];
 
-        // kirim email
-        try {
-            Mail::to($report->user->email)
-                ->send(new ReportStatusUpdatedMail($report));
-        } catch (\Exception $e) {
-            \Log::error('Email gagal: ' . $e->getMessage());
+        // Email hanya dikirim setelah transaksi database berhasil.
+        // Kegagalan email tidak membatalkan perubahan status yang sudah tersimpan.
+        if ($report->user && $report->user->email) {
+            try {
+                Mail::to($report->user->email)
+                    ->send(new ReportStatusUpdatedMail($report));
+            } catch (\Throwable $e) {
+                \Log::error('Email notifikasi perubahan status gagal dikirim', [
+                    'report_id' => $report->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Status berhasil diperbarui',
-            'data' => $report
+            'data' => $report,
+            'previous_status' => $result['previous_status'],
         ]);
     }
+
 }

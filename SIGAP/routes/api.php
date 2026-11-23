@@ -91,13 +91,11 @@ Route::prefix('admin')->middleware(['auth:api', 'admin'])->group(function () {
         'store'
     ]);
 
-    // list update proyek
-    Route::get('/reports/{id}/updates', function ($id) {
-        return \App\Models\ProjectUpdate::with('images')
-            ->where('report_id', $id)
-            ->latest()
-            ->get();
-    });
+    // list update proyek (urutan kronologis: terlama ke terbaru)
+    Route::get('/reports/{id}/updates', [
+        ProjectUpdateController::class,
+        'index',
+    ]);
 
     // STATISTICS
     Route::get('/statistics', function () {
@@ -144,5 +142,48 @@ Route::prefix('spa')->group(function () {
         // Komentar dari SPA (sesi Sanctum). Versi JWT di atas tetap ada selama migrasi.
         Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
         Route::delete('/comments/{id}', [CommentController::class, 'destroy']);
+
+        // ADMIN ROUTES UNTUK SPA (Sanctum session authentication).
+        // Route JWT lama di atas tetap dipertahankan selama masa migrasi.
+        Route::prefix('admin')->middleware('admin')->group(function () {
+            // Semua laporan, termasuk laporan yang ditolak.
+            Route::get('/reports', [ReportController::class, 'index']);
+
+            // Detail laporan khusus admin (termasuk laporan yang ditolak).
+            Route::get('/reports/{id}', [ReportController::class, 'adminShow']);
+
+            // Perubahan status laporan.
+            Route::patch('/reports/{id}/status', [
+                ReportController::class,
+                'updateStatus',
+            ]);
+
+            // Riwayat dan penambahan progres laporan.
+            Route::get('/reports/{id}/updates', [
+                ProjectUpdateController::class,
+                'index',
+            ]);
+
+            Route::post('/reports/{id}/updates', [
+                ProjectUpdateController::class,
+                'store',
+            ]);
+
+            // Statistik admin.
+            Route::get('/statistics', function () {
+                return response()->json([
+                    'total_reports' => \App\Models\Report::count(),
+                    'by_status' => \App\Models\Report::selectRaw('status, COUNT(*) as total')
+                        ->groupBy('status')
+                        ->get(),
+                    'by_category' => \App\Models\Report::selectRaw('category_id, COUNT(*) as total')
+                        ->groupBy('category_id')
+                        ->get(),
+                    'by_district' => \App\Models\Report::selectRaw('district, COUNT(*) as total')
+                        ->groupBy('district')
+                        ->get(),
+                ]);
+            });
+        });
     });
 });
