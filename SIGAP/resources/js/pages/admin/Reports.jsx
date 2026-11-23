@@ -1,52 +1,148 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import reportService from '../../services/reportService';
 
-const reportsData = [
-    { id: 1, title: 'Jalan berlubang di Lowokwaru', date: '2026-11-20', category: 'Jalan & Transportasi', district: 'Lowokwaru', priority: 86, status: 'masuk' },
-    { id: 2, title: 'Lampu jalan tidak menyala', date: '2026-11-19', category: 'Penerangan Umum', district: 'Klojen', priority: 65, status: 'diverifikasi' },
-    { id: 3, title: 'Saluran air tersumbat', date: '2026-11-18', category: 'Air & Drainase', district: 'Blimbing', priority: 48, status: 'ditindaklanjuti' },
-    { id: 4, title: 'Kerusakan fasilitas taman', date: '2026-11-17', category: 'Ruang Publik', district: 'Sukun', priority: 32, status: 'selesai' },
-    { id: 5, title: 'Jalan rusak dekat sekolah', date: '2026-11-16', category: 'Jalan & Transportasi', district: 'Lowokwaru', priority: 72, status: 'ditolak' },
-    { id: 6, title: 'Drainase lingkungan perlu dibersihkan', date: '2026-11-15', category: 'Air & Drainase', district: 'Kedungkandang', priority: 57, status: 'masuk' },
-];
-
-const statusLabels = { masuk: 'Masuk', diverifikasi: 'Diverifikasi', ditindaklanjuti: 'Ditindaklanjuti', selesai: 'Selesai', ditolak: 'Ditolak' };
-const statusStyles = { masuk: 'bg-amber-100 text-amber-800', diverifikasi: 'bg-violet-100 text-violet-800', ditindaklanjuti: 'bg-blue-100 text-blue-800', selesai: 'bg-green-100 text-green-800', ditolak: 'bg-red-100 text-red-800' };
-const transitions = { masuk: ['diverifikasi', 'ditolak'], diverifikasi: ['ditindaklanjuti', 'ditolak'], ditindaklanjuti: ['selesai'], selesai: [], ditolak: [] };
-const districts = ['Lowokwaru', 'Klojen', 'Blimbing', 'Sukun', 'Kedungkandang'];
-const categories = ['Jalan & Transportasi', 'Penerangan Umum', 'Air & Drainase', 'Ruang Publik'];
-const dateLabel = (date) => new Date(`${date}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const statusLabels = {
+    masuk: 'Masuk',
+    diverifikasi: 'Diverifikasi',
+    ditindaklanjuti: 'Ditindaklanjuti',
+    selesai: 'Selesai',
+    ditolak: 'Ditolak',
+};
+const statusStyles = {
+    masuk: 'bg-amber-100 text-amber-800',
+    diverifikasi: 'bg-violet-100 text-violet-800',
+    ditindaklanjuti: 'bg-blue-100 text-blue-800',
+    selesai: 'bg-green-100 text-green-800',
+    ditolak: 'bg-red-100 text-red-800',
+};
+const transitions = {
+    masuk: ['diverifikasi', 'ditolak'],
+    diverifikasi: ['ditindaklanjuti', 'ditolak'],
+    ditindaklanjuti: ['selesai'],
+    selesai: [],
+    ditolak: [],
+};
+const dateLabel = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('id-ID', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+};
 
 function Priority({ value }) {
-    const color = value >= 70 ? 'bg-red-50 text-red-700' : value >= 40 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700';
-    return <span className={`inline-flex min-w-10 justify-center rounded-md px-2 py-1 text-xs font-bold ${color}`}>{value}</span>;
+    const score = Number(value) || 0;
+    const color = score >= 70
+        ? 'bg-red-50 text-red-700'
+        : score >= 40
+            ? 'bg-amber-50 text-amber-700'
+            : 'bg-green-50 text-green-700';
+    return <span className={`inline-flex min-w-10 justify-center rounded-md px-2 py-1 text-xs font-bold ${color}`}>{score.toFixed(0)}</span>;
+}
+
+function errorMessage(error, fallback) {
+    const validationErrors = error.response?.data?.errors;
+    if (validationErrors) {
+        const first = Object.values(validationErrors).flat()[0];
+        if (first) return first;
+    }
+    return error.response?.data?.message || fallback;
 }
 
 export default function AdminReports() {
     const [search, setSearch] = useState('');
     const [district, setDistrict] = useState('');
-    const [category, setCategory] = useState('');
+    const [categoryId, setCategoryId] = useState('');
     const [status, setStatus] = useState('');
     const [sort, setSort] = useState('newest');
     const [page, setPage] = useState(1);
-    const [rows, setRows] = useState(reportsData);
-    const pageSize = 5;
+    const [reports, setReports] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [districts, setDistricts] = useState([]);
+    const [meta, setMeta] = useState({ current_page: 1, last_page: 1, per_page: 10, total: 0 });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [updatingId, setUpdatingId] = useState(null);
+    const pageSize = 10;
 
-    const filtered = useMemo(() => {
-        const result = rows.filter((report) =>
-            (!district || report.district === district) &&
-            (!category || report.category === category) &&
-            (!status || report.status === status) &&
-            (!search || report.title.toLowerCase().includes(search.toLowerCase()))
-        );
-        return result.sort((a, b) => sort === 'oldest' ? a.date.localeCompare(b.date) : sort === 'priority' ? b.priority - a.priority : b.date.localeCompare(a.date));
-    }, [rows, district, category, status, search, sort]);
+    useEffect(() => {
+        let active = true;
 
-    const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const currentPage = Math.min(page, pageCount);
-    const visibleRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-    const resetFilters = () => { setDistrict(''); setCategory(''); setStatus(''); setSearch(''); setSort('newest'); setPage(1); };
-    const updateStatus = (id, nextStatus) => setRows((current) => current.map((report) => report.id === id ? { ...report, status: nextStatus } : report));
+        Promise.all([reportService.getCategories(), reportService.getDistrictStats()])
+            .then(([categoryResponse, districtResponse]) => {
+                if (!active) return;
+                setCategories(Array.isArray(categoryResponse?.data) ? categoryResponse.data : Array.isArray(categoryResponse) ? categoryResponse : []);
+                setDistricts(Array.isArray(districtResponse?.data) ? districtResponse.data : []);
+            })
+            .catch((requestError) => {
+                if (active) setError(errorMessage(requestError, 'Filter kategori dan kecamatan gagal dimuat.'));
+            });
+
+        return () => { active = false; };
+    }, []);
+
+    const loadReports = useCallback(async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+            const response = await reportService.getAdminReports({
+                page,
+                per_page: pageSize,
+                search: search.trim() || undefined,
+                district: district || undefined,
+                category_id: categoryId || undefined,
+                status: status || undefined,
+                sort,
+            });
+
+            setReports(Array.isArray(response?.data) ? response.data : []);
+            setMeta(response?.meta || { current_page: page, last_page: 1, per_page: pageSize, total: 0 });
+        } catch (requestError) {
+            setError(errorMessage(requestError, 'Daftar laporan gagal dimuat.'));
+            setReports([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [page, search, district, categoryId, status, sort]);
+
+    useEffect(() => {
+        loadReports();
+    }, [loadReports]);
+
+    const resetFilters = () => {
+        setSearch('');
+        setDistrict('');
+        setCategoryId('');
+        setStatus('');
+        setSort('newest');
+        setPage(1);
+        setNotice('');
+    };
+
+    const updateStatus = async (report, nextStatus) => {
+        setUpdatingId(report.id);
+        setNotice('');
+        setError('');
+
+        try {
+            await reportService.updateAdminReportStatus(report.id, nextStatus);
+            setNotice(`Status laporan #${report.id} berhasil diperbarui menjadi ${statusLabels[nextStatus]}.`);
+            await loadReports();
+        } catch (requestError) {
+            setError(errorMessage(requestError, 'Status laporan gagal diperbarui.'));
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    const currentPage = Number(meta.current_page) || page;
+    const lastPage = Math.max(1, Number(meta.last_page) || 1);
+    const total = Number(meta.total) || 0;
+    const firstItem = total ? (currentPage - 1) * pageSize + 1 : 0;
+    const lastItem = Math.min(currentPage * pageSize, total);
 
     return (
         <div className="space-y-6 text-green-dark">
@@ -56,33 +152,41 @@ export default function AdminReports() {
                 <p className="mt-1 text-sm text-muted">Kelola dan pantau seluruh laporan masyarakat.</p>
             </header>
 
+            {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+            {notice && <div role="status" className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{notice}</div>}
+
             <section className="rounded-xl border border-cream-dark bg-white p-5">
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <label className="text-xs font-bold text-muted">Kecamatan
-                        <select value={district} onChange={(e) => { setDistrict(e.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
-                            <option value="">Semua Kecamatan</option>{districts.map((item) => <option key={item}>{item}</option>)}
+                        <select value={district} onChange={(event) => { setDistrict(event.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
+                            <option value="">Semua Kecamatan</option>
+                            {districts.map((item) => <option key={item.id || item.name} value={item.name}>{item.name}</option>)}
                         </select>
                     </label>
                     <label className="text-xs font-bold text-muted">Kategori
-                        <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
-                            <option value="">Semua Kategori</option>{categories.map((item) => <option key={item}>{item}</option>)}
+                        <select value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
+                            <option value="">Semua Kategori</option>
+                            {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </select>
                     </label>
                     <label className="text-xs font-bold text-muted">Status
-                        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
-                            <option value="">Semua Status</option>{Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                        <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
+                            <option value="">Semua Status</option>
+                            {Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                         </select>
                     </label>
                     <label className="text-xs font-bold text-muted">Urutkan
-                        <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
-                            <option value="newest">Tanggal terbaru</option><option value="oldest">Tanggal terlama</option><option value="priority">Priority tertinggi</option>
+                        <select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }} className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm font-normal text-green-dark outline-none focus:border-green-mid">
+                            <option value="newest">Tanggal terbaru</option>
+                            <option value="oldest">Tanggal terlama</option>
+                            <option value="priority">Priority tertinggi</option>
                         </select>
                     </label>
                     <label className="text-xs font-bold text-muted">Cari laporan
-                        <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Cari judul laporan..." className="mt-1.5 w-full rounded-lg border border-cream-dark px-3 py-2.5 text-sm font-normal text-green-dark outline-none placeholder:text-muted/70 focus:border-green-mid" />
+                        <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Cari judul laporan..." className="mt-1.5 w-full rounded-lg border border-cream-dark px-3 py-2.5 text-sm font-normal text-green-dark outline-none placeholder:text-muted/70 focus:border-green-mid" />
                     </label>
                 </div>
-                {(district || category || status || search || sort !== 'newest') && <button type="button" onClick={resetFilters} className="mt-4 text-xs font-semibold text-accent hover:underline">✕ Reset filter</button>}
+                {(district || categoryId || status || search || sort !== 'newest') && <button type="button" onClick={resetFilters} className="mt-4 text-xs font-semibold text-accent hover:underline">✕ Reset filter</button>}
             </section>
 
             <section className="overflow-hidden rounded-xl border border-cream-dark bg-white">
@@ -92,26 +196,47 @@ export default function AdminReports() {
                         <thead className="bg-green-dark text-xs uppercase tracking-wider text-white"><tr>
                             {['ID', 'Judul', 'Tanggal Laporan', 'Kategori', 'Priority Score', 'Status', 'Aksi'].map((label) => <th key={label} className="px-4 py-3">{label}</th>)}
                         </tr></thead>
-                        <tbody>{visibleRows.map((report) => <tr key={report.id} className="border-b border-cream-dark last:border-0 hover:bg-cream/70">
-                            <td className="px-4 py-4 font-semibold text-muted">#{String(report.id).padStart(3, '0')}</td>
-                            <td className="max-w-xs px-4 py-4 font-semibold">{report.title}</td>
-                            <td className="px-4 py-4 text-muted">{dateLabel(report.date)}</td>
-                            <td className="px-4 py-4 text-muted">{report.category}</td>
-                            <td className="px-4 py-4"><Priority value={report.priority} /></td>
-                            <td className="px-4 py-4">{transitions[report.status].length ? <select aria-label={`Ubah status laporan ${report.title}`} value={report.status} onChange={(e) => updateStatus(report.id, e.target.value)} className={`rounded-full border-0 px-3 py-2 text-xs font-semibold outline-none ${statusStyles[report.status]}`}>
-                                <option value={report.status}>{statusLabels[report.status]}</option>{transitions[report.status].map((next) => <option key={next} value={next}>{statusLabels[next]}</option>)}
-                            </select> : <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[report.status]}`}>{statusLabels[report.status]}</span>}</td>
-                            <td className="px-4 py-4"><Link to={`/admin/reports/${report.id}`} className="whitespace-nowrap font-bold text-green-mid hover:underline">◉ Detail</Link></td>
-                        </tr>)}</tbody>
+                        <tbody>
+                            {reports.map((report) => {
+                                const allowedNext = transitions[report.status] || [];
+                                return (
+                                    <tr key={report.id} className="border-b border-cream-dark last:border-0 hover:bg-cream/70">
+                                        <td className="px-4 py-4 font-semibold text-muted">#{report.id}</td>
+                                        <td className="max-w-xs px-4 py-4 font-semibold">{report.title}</td>
+                                        <td className="px-4 py-4 text-muted">{dateLabel(report.created_at)}</td>
+                                        <td className="px-4 py-4 text-muted">{report.category?.name || '-'}</td>
+                                        <td className="px-4 py-4"><Priority value={report.priority_score} /></td>
+                                        <td className="px-4 py-4">
+                                            {allowedNext.length ? (
+                                                <select
+                                                    aria-label={`Ubah status laporan ${report.title}`}
+                                                    value={report.status}
+                                                    disabled={updatingId === report.id}
+                                                    onChange={(event) => updateStatus(report, event.target.value)}
+                                                    className={`rounded-full border-0 px-3 py-2 text-xs font-semibold outline-none disabled:opacity-60 ${statusStyles[report.status] || 'bg-gray-100 text-gray-700'}`}
+                                                >
+                                                    <option value={report.status}>{statusLabels[report.status] || report.status}</option>
+                                                    {allowedNext.map((next) => <option key={next} value={next}>{statusLabels[next]}</option>)}
+                                                </select>
+                                            ) : (
+                                                <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[report.status] || 'bg-gray-100 text-gray-700'}`}>{statusLabels[report.status] || report.status}</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4"><Link to={`/admin/reports/${report.id}`} className="whitespace-nowrap font-bold text-green-mid hover:underline">◉ Detail</Link></td>
+                                    </tr>
+                                );
+                            })}
+                            {!loading && reports.length === 0 && <tr><td colSpan="7" className="px-5 py-10 text-center text-sm text-muted">Tidak ada laporan yang sesuai dengan filter.</td></tr>}
+                            {loading && <tr><td colSpan="7" className="px-5 py-10 text-center text-sm text-muted">Memuat laporan...</td></tr>}
+                        </tbody>
                     </table>
-                    {!visibleRows.length && <p className="px-5 py-10 text-center text-sm text-muted">Tidak ada laporan yang sesuai dengan filter.</p>}
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-cream-dark px-5 py-4 text-xs text-muted">
-                    <span>Menampilkan <strong>{filtered.length ? (currentPage - 1) * pageSize + 1 : 0}</strong>–<strong>{Math.min(currentPage * pageSize, filtered.length)}</strong> dari <strong>{filtered.length}</strong> laporan</span>
-                    <div className="flex items-center gap-1">
-                        <button type="button" disabled={currentPage === 1} onClick={() => setPage((value) => value - 1)} className="rounded-md border border-cream-dark px-3 py-1.5 font-semibold disabled:opacity-40">Sebelumnya</button>
-                        {Array.from({ length: pageCount }, (_, index) => index + 1).map((number) => <button key={number} type="button" onClick={() => setPage(number)} className={`rounded-md px-3 py-1.5 font-semibold ${number === currentPage ? 'bg-green-dark text-white' : 'border border-cream-dark hover:bg-cream'}`}>{number}</button>)}
-                        <button type="button" disabled={currentPage === pageCount} onClick={() => setPage((value) => value + 1)} className="rounded-md border border-cream-dark px-3 py-1.5 font-semibold disabled:opacity-40">Berikutnya</button>
+                    <span>Menampilkan <strong>{firstItem}</strong>–<strong>{lastItem}</strong> dari <strong>{total}</strong> laporan</span>
+                    <div className="flex items-center gap-2">
+                        <button type="button" disabled={currentPage <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-cream-dark px-3 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Sebelumnya</button>
+                        <span className="px-2">Halaman {currentPage} / {lastPage}</span>
+                        <button type="button" disabled={currentPage >= lastPage || loading} onClick={() => setPage((value) => Math.min(lastPage, value + 1))} className="rounded-lg border border-cream-dark px-3 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Berikutnya</button>
                     </div>
                 </div>
             </section>

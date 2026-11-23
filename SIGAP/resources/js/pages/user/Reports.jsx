@@ -22,8 +22,8 @@ export default function Reports() {
         setLoading(true);
         setError('');
         try {
-            const { data } = await api.get('/profile/riwayat/filter');
-            setReports(Array.isArray(data) ? data : data.data || []);
+            const { data } = await api.get('/api/spa/profile');
+            setReports(data.reports || []);
         } catch (err) {
             setError(err.response?.data?.message || 'Riwayat laporan gagal dimuat. Pastikan Anda sudah login.');
         } finally { setLoading(false); }
@@ -40,7 +40,7 @@ export default function Reports() {
         if (!window.confirm(`Hapus laporan "${report.title}"? Laporan hanya dapat dihapus saat status masih Masuk.`)) return;
         setDeleting(report.id);
         try {
-            await api.delete(`/laporan/${report.id}`);
+            await api.delete(`/api/spa/reports/${report.id}`);
             setReports((current) => current.filter((item) => item.id !== report.id));
         } catch (err) {
             window.alert(err.response?.data?.message || 'Laporan gagal dihapus. Pastikan status laporan masih Masuk.');

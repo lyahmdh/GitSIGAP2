@@ -61,6 +61,16 @@ function RequireAdmin() {
     return <Outlet />;
 }
 
+function RequireRegularUser() {
+    const { user, loading } = useAuth();
+
+    if (loading) return <LoadingScreen />;
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role === 'admin') return <Navigate to="/admin" replace />;
+
+    return <Outlet />;
+}
+
 function GuestOnly() {
     const { user, loading } = useAuth();
 
@@ -99,15 +109,17 @@ const router = createBrowserRouter(
             element: <RequireAuth />,
             children: [
                 {
-                    path: '/verify-email',
-                    element: <VerifyEmail />,
-                },
-                {
-                    element: <UserLayout />,
+                    element: <RequireRegularUser />,
                     children: [
-                        { path: '/reports/create', element: <CreateReport /> },
-                        { path: '/reports/:id', element: <ReportDetail /> },
-                        { path: '/profile', element: <Profile /> },
+                        { path: '/verify-email', element: <VerifyEmail /> },
+                        {
+                            element: <UserLayout />,
+                            children: [
+                                { path: '/reports/create', element: <CreateReport /> },
+                                { path: '/reports/:id', element: <ReportDetail /> },
+                                { path: '/profile', element: <Profile /> },
+                            ],
+                        },
                     ],
                 },
             ],

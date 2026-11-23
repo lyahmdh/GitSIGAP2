@@ -47,7 +47,7 @@ class StoreReportRequest extends FormRequest
                 'required',
                 'image',
                 'mimes:jpg,jpeg,png',
-                'max:2048'
+                'max:1024'
             ]
         ];
     }
