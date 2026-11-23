@@ -65,7 +65,6 @@ Route::prefix('spa')->group(function () {
         Route::delete('/comments/{id}', [CommentController::class, 'destroy']);
 
         // ADMIN ROUTES UNTUK SPA (Sanctum session authentication).
-        // Route JWT lama di atas tetap dipertahankan selama masa migrasi.
         Route::prefix('admin')->middleware('admin')->group(function () {
             // Semua laporan, termasuk laporan yang ditolak.
             Route::get('/reports', [ReportController::class, 'index']);
