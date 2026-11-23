@@ -221,7 +221,6 @@ export default function CreateReport() {
     return (
         <div className="mx-auto max-w-4xl pb-10">
             <div className="mb-7 text-center">
-                <Link to="/profile" className="text-sm font-semibold text-emerald-700 hover:underline">← Kembali ke Profil</Link>
                 <h1 className="mt-4 text-3xl font-bold text-slate-900">Buat Laporan</h1>
                 <p className="mt-2 text-sm text-slate-500">Sampaikan permasalahan fasilitas publik agar dapat segera ditindaklanjuti.</p>
             </div>
@@ -287,7 +286,7 @@ export default function CreateReport() {
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h2 className="font-bold text-slate-900">Bukti Pendukung<span className="text-red-500">*</span></h2>
-                    <p className="mt-1 text-sm text-slate-500">Unggah 1–5 foto bukti dengan format JPG atau PNG. Ukuran maksimal 2 MB per foto.</p>
+                    <p className="mt-1 text-sm text-slate-500">Unggah 1–5 foto bukti dengan format JPG atau PNG. Ukuran maksimal 1 MB per foto.</p>
                     <label className="mt-4 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-5 text-center hover:bg-emerald-50">
                         <span className="text-3xl text-emerald-700">＋</span>
                         <span className="mt-2 text-sm font-semibold text-emerald-800">Pilih foto atau klik untuk mengunggah</span>

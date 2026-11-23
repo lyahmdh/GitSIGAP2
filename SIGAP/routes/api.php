@@ -20,6 +20,22 @@ Route::prefix('auth')->group(function () {
 Route::get('/reports', [ReportController::class, 'index']);
 Route::get('/reports/stats/districts', [ReportController::class, 'districtStats']);
 Route::get('/reports/map-points', [ReportController::class, 'mapPoints']);
+Route::get('/public/home-stats', function () {
+    $total = \App\Models\Report::count();
+    $accepted = \App\Models\Report::whereIn('status', [
+        'diverifikasi', 'ditindaklanjuti', 'selesai',
+    ])->count();
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'total' => $total,
+            'aktif' => \App\Models\Report::whereIn('status', ['diverifikasi', 'ditindaklanjuti'])->count(),
+            'selesai' => \App\Models\Report::where('status', 'selesai')->count(),
+            'diterima' => $accepted,
+        ],
+    ]);
+});
 Route::get('/reports/{id}', [ReportController::class, 'show']);
 
 // komentar publik (lihat komentar)
@@ -129,6 +145,7 @@ Route::prefix('spa')->group(function () {
         Route::get('/auth/me', [SpaAuthController::class, 'me']);
         Route::get('/profile', [SpaProfileController::class, 'show']);
         Route::post('/reports', [ReportController::class, 'store']);
+        Route::delete('/reports/{id}', [ReportController::class, 'destroy']);
         Route::put('/profile', [SpaProfileController::class, 'update']);
         Route::delete('/profile/photo', [SpaProfileController::class, 'destroyPhoto']);
 

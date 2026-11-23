@@ -61,11 +61,9 @@ export default function Footer() {
                         </p>
                         <ul className="space-y-2.5 text-[13.5px] text-white/60">
                             <li className="flex items-start gap-2">
-                                <span aria-hidden="true" className="mt-0.5 text-accent">✉</span>
                                 <a href="mailto:sigapheadoffice@gmail.com" className="hover:text-accent">sigapheadoffice@gmail.com</a>
                             </li>
                             <li className="flex items-start gap-2">
-                                <span aria-hidden="true" className="mt-0.5 text-accent">⌖</span>
                                 <span>Jl. Veteran No. 1, Malang, Jawa Timur</span>
                             </li>
                         </ul>
