@@ -1,321 +1,243 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import api, { initializeCsrf } from '../../services/api';
-import { booleanPointInPolygon, point } from '@turf/turf';
-import districtGeoJson from '../../data/kecamatan_kota_malang.json';
 
-const markerDefault = L.icon({
-    iconUrl: markerIcon,
-    iconRetinaUrl: markerIcon2x,
-    shadowUrl: markerShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41],
-});
-const DEFAULT_CENTER = [-7.9666, 112.6326];
-const inputClass = 'mt-2 w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100';
-
-function findDistrict(lat, lng) {
-    const locationPoint = point([Number(lng), Number(lat)]);
-    const feature = districtGeoJson.features.find((item) =>
-        booleanPointInPolygon(locationPoint, item),
-    );
-    return feature?.properties?.NAME_3 || null;
-}
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export default function CreateReport() {
-    const navigate = useNavigate();
-    const mapElement = useRef(null);
-    const mapRef = useRef(null);
-    const markerRef = useRef(null);
-    const fileInput = useRef(null);
-    const [categories, setCategories] = useState([]);
-    const [districts, setDistricts] = useState([]);
-    const districtsRef = useRef([]);
-    districtsRef.current = districts;
-    const [mapReports, setMapReports] = useState([]);
-    const [submitError, setSubmitError] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const [categoryError, setCategoryError] = useState('');
-    const [coordinates, setCoordinates] = useState(null);
-    const [images, setImages] = useState([]);
-    const [previewUrls, setPreviewUrls] = useState([]);
-    const [imageError, setImageError] = useState('');
-    const [locating, setLocating] = useState(false);
+    const [form, setForm] = useState({
+        category_id: '',
+        title: '',
+        description: '',
+        severity: '2',
+        location_detail: '',
+        district: '',
+        latitude: '',
+        longitude: '',
+        anonymous: false,
+        images: [],
+    });
 
-    useEffect(() => {
-        const urls = images.map((file) => URL.createObjectURL(file));
-        setPreviewUrls(urls);
-        return () => urls.forEach((url) => URL.revokeObjectURL(url));
-    }, [images]);
-
-    useEffect(() => {
-        let active = true;
-        api.get('/api/categories')
-            .then(({ data }) => { if (active) setCategories(Array.isArray(data) ? data : data.data || []); })
-            .catch(() => { if (active) setCategoryError('Kategori gagal dimuat. Muat ulang halaman atau coba lagi.'); });
-        api.get('/api/reports/stats/districts')
-            .then(({ data }) => { if (active) setDistricts(data.data || []); })
-            .catch(() => {});
-        return () => { active = false; };
-    }, []);
-
-    useEffect(() => {
-        if (!mapElement.current || mapRef.current) return undefined;
-        let active = true;
-        const map = L.map(mapElement.current, { scrollWheelZoom: false }).setView(DEFAULT_CENTER, 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
-        }).addTo(map);
-        L.geoJSON(districtGeoJson, {
-            style: { color: '#166534', weight: 2, opacity: 0.65, fillColor: '#86efac', fillOpacity: 0.035 },
-            onEachFeature: (feature, layer) => {
-                layer.bindTooltip(feature.properties?.NAME_3 || 'Kecamatan', { sticky: true });
-            },
-        }).addTo(map);
-        // Laporan terdahulu ditampilkan sebagai titik pada peta agar pelapor dapat
-        // melihat sebaran laporan sebelum menentukan lokasi baru.
-        api.get('/api/reports/map-points').then(({ data }) => {
-            if (!active) return;
-            setMapReports(data.data || []);
-            (data.data || []).forEach((report) => {
-                const lat = Number(report.latitude);
-                const lng = Number(report.longitude);
-                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-                const dot = L.circleMarker([lat, lng], {
-                    radius: 7,
-                    color: '#7c2d12',
-                    weight: 1.5,
-                    fillColor: '#f97316',
-                    fillOpacity: 0.55,
-                }).addTo(map);
-                const popup = document.createElement('div');
-                const title = document.createElement('strong');
-                title.textContent = report.title || 'Laporan';
-                const district = document.createElement('div');
-                district.textContent = report.district || '';
-                const status = document.createElement('small');
-                status.textContent = report.status || '';
-                popup.append(title, district, status);
-                dot.bindPopup(popup);
-            });
-        }).catch(() => {});
-
-        const marker = L.marker(DEFAULT_CENTER, { draggable: true, icon: markerDefault }).addTo(map);
-        map.on('click', (event) => setLocation(event.latlng.lat, event.latlng.lng));
-        marker.on('dragend', () => {
-            const point = marker.getLatLng();
-            setLocation(point.lat, point.lng);
-        });
-        mapRef.current = map;
-        markerRef.current = marker;
-        const timer = window.setTimeout(() => map.invalidateSize(), 100);
-        return () => {
-            active = false;
-            window.clearTimeout(timer);
-            map.remove();
-            mapRef.current = null;
-            markerRef.current = null;
-        };
-    }, []);
-
-    function setLocation(lat, lng) {
-        const district = findDistrict(lat, lng);
-        const districtRecord = districtsRef.current.find((item) =>
-            String(item.name).toLowerCase() === String(district || '').toLowerCase(),
-        );
-        setCoordinates({
-            latitude: lat.toFixed(8),
-            longitude: lng.toFixed(8),
-            district: district || '',
-            district_id: districtRecord?.id || '',
-        });
-        markerRef.current?.setLatLng([lat, lng]);
+    function updateField(name, value) {
+        setForm((previous) => ({
+            ...previous,
+            [name]: value,
+        }));
     }
 
-    function useCurrentLocation() {
-        if (!navigator.geolocation) {
-            window.alert('Geolokasi tidak didukung browser Anda.');
-            return;
-        }
-        setLocating(true);
-        navigator.geolocation.getCurrentPosition(
-            ({ coords: point }) => {
-                setLocation(point.latitude, point.longitude);
-                mapRef.current?.setView([point.latitude, point.longitude], 17);
-                setLocating(false);
-            },
-            () => {
-                window.alert('Gagal mendapatkan lokasi. Pastikan izin lokasi diaktifkan.');
-                setLocating(false);
-            },
-            { enableHighAccuracy: true, timeout: 10000 },
-        );
+    function handleImages(event) {
+        const files = Array.from(event.target.files || []);
+
+        setForm((previous) => ({
+            ...previous,
+            images: files.slice(0, 5),
+        }));
     }
 
-    function addImages(fileList) {
-        const incoming = Array.from(fileList || []);
-        const next = [...images];
-        let message = '';
-        incoming.forEach((file) => {
-            if (!['image/jpeg', 'image/png'].includes(file.type)) message = 'Format foto harus JPG atau PNG.';
-            else if (file.size > 2 * 1024 * 1024) message = 'Ukuran setiap foto maksimal 2 MB.';
-            else if (next.length >= 5) message = 'Maksimal 5 foto yang dapat diunggah.';
-            else if (!next.some((item) => item.name === file.name && item.size === file.size)) next.push(file);
-        });
-        setImages(next);
-        setImageError(message);
-        const transfer = new DataTransfer();
-        next.forEach((file) => transfer.items.add(file));
-        if (fileInput.current) fileInput.current.files = transfer.files;
-    }
-
-    function removeImage(index) {
-        const next = images.filter((_, itemIndex) => itemIndex !== index);
-        setImages(next);
-        const transfer = new DataTransfer();
-        next.forEach((file) => transfer.items.add(file));
-        if (fileInput.current) fileInput.current.files = transfer.files;
-    }
-
-    async function handleSubmit(event) {
+    function handleSubmit(event) {
         event.preventDefault();
-        setSubmitError('');
-        if (!coordinates || !coordinates.district_id) {
-            setSubmitError('Pilih titik yang berada di dalam wilayah Kota Malang pada peta. Kecamatan akan ditentukan otomatis dari GeoJSON.');
-            return;
-        }
-        if (images.length < 1) {
-            setImageError('Harap unggah minimal 1 foto bukti.');
-            return;
-        }
-        const form = event.currentTarget;
-        const formData = new FormData(form);
-        formData.delete('images[]');
-        images.forEach((file) => formData.append('images[]', file));
-        formData.set('district', coordinates.district);
-        formData.set('district_id', String(coordinates.district_id));
-        formData.set('latitude', coordinates.latitude);
-        formData.set('longitude', coordinates.longitude);
-        formData.set('is_anonymous', form.elements.is_anonymous.checked ? '1' : '0');
 
-        try {
-            setSubmitting(true);
-            await initializeCsrf();
-            const { data } = await api.post('/api/spa/reports', formData);
-            navigate(`/profile`, { state: { successMessage: data.message || 'Laporan berhasil dikirim.' } });
-        } catch (error) {
-            const validation = error.response?.data?.errors;
-            const firstError = validation ? Object.values(validation).flat()[0] : null;
-            setSubmitError(firstError || error.response?.data?.message || 'Laporan gagal dikirim. Silakan coba lagi.');
-            setSubmitting(false);
-        }
+        // Integrasi API akan dilakukan pada batch backend.
+        console.log('Data formulir laporan:', form);
     }
 
     return (
-        <div className="mx-auto max-w-4xl pb-10">
-            <div className="mb-7 text-center">
-                <h1 className="mt-4 text-3xl font-bold text-slate-900">Buat Laporan</h1>
-                <p className="mt-2 text-sm text-slate-500">Sampaikan permasalahan fasilitas publik agar dapat segera ditindaklanjuti.</p>
+        <div className="mx-auto max-w-4xl">
+            <div className="mb-8">
+                <Link to="/reports" className="text-sm font-medium text-emerald-700">
+                    ← Kembali ke laporan
+                </Link>
+
+                <h1 className="mt-4 text-2xl font-bold text-slate-900">
+                    Buat Laporan Baru
+                </h1>
+
+                <p className="mt-2 text-sm text-slate-500">
+                    Sampaikan permasalahan fasilitas publik agar dapat ditindaklanjuti.
+                </p>
             </div>
 
-            <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-6">
-                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="bg-gradient-to-r from-amber-950 to-amber-800 px-6 py-4 text-white">
-                        <h2 className="font-bold">Sampaikan Laporan Anda</h2>
-                    </div>
-                    <div className="space-y-5 p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <section className="rounded-2xl border border-slate-200 bg-white p-6">
+                    <h2 className="font-bold text-slate-900">Informasi Laporan</h2>
+
+                    <div className="mt-5 space-y-5">
                         <div>
-                            <label htmlFor="category_id" className="text-sm font-semibold text-slate-700">Kategori Laporan <span className="text-red-500">*</span></label>
-                            <select id="category_id" name="category_id" required className={inputClass} defaultValue="">
-                                <option value="" disabled>Pilih kategori…</option>
-                                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                            <label className="text-sm font-semibold text-slate-700">
+                                Kategori Laporan
+                            </label>
+                            <select
+                                required
+                                value={form.category_id}
+                                onChange={(e) => updateField('category_id', e.target.value)}
+                                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+                            >
+                                <option value="">Pilih kategori</option>
+                                <option value="1">Jalan & Transportasi</option>
+                                <option value="2">Air & Drainase</option>
+                                <option value="3">Ruang Publik</option>
+                                <option value="4">Penerangan Umum</option>
                             </select>
-                            {categoryError && <p className="mt-2 text-xs text-red-600">{categoryError}</p>}
                         </div>
+
                         <div>
-                            <label htmlFor="title" className="text-sm font-semibold text-slate-700">Judul Laporan <span className="text-red-500">*</span></label>
-                            <input id="title" name="title" required maxLength={80} placeholder="Contoh: Jalan Berlubang di Jl. Veteran" className={inputClass} />
-                            <p className="mt-1 text-right text-xs text-slate-400">Maksimal 80 karakter</p>
+                            <label className="text-sm font-semibold text-slate-700">
+                                Judul Laporan
+                            </label>
+                            <input
+                                required
+                                maxLength={150}
+                                value={form.title}
+                                onChange={(e) => updateField('title', e.target.value)}
+                                placeholder="Contoh: Jalan berlubang di sekitar..."
+                                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+                            />
                         </div>
+
                         <div>
-                            <label htmlFor="description" className="text-sm font-semibold text-slate-700">Deskripsi Laporan <span className="text-red-500">*</span></label>
-                            <textarea id="description" name="description" required rows={4} placeholder="Jelaskan kondisi kerusakan secara detail, termasuk dampaknya bagi warga…" className={inputClass} />
+                            <label className="text-sm font-semibold text-slate-700">
+                                Deskripsi Permasalahan
+                            </label>
+                            <textarea
+                                required
+                                rows={5}
+                                value={form.description}
+                                onChange={(e) => updateField('description', e.target.value)}
+                                placeholder="Jelaskan permasalahan secara rinci..."
+                                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+                            />
                         </div>
+
                         <div>
-                            <label className="text-sm font-semibold text-slate-700">Lokasi Kejadian <span className="text-red-500">*</span></label>
-                            <p className="mb-2 mt-1 text-xs text-slate-500">Klik peta atau geser pin untuk menentukan titik lokasi laporan.</p>
-                            <div className="relative isolate overflow-hidden rounded-xl border border-slate-200">
-                                <div ref={mapElement} className="z-0 h-[300px] w-full [&_.leaflet-tile]:max-w-none" />
-                                <button type="button" onClick={useCurrentLocation} disabled={locating} className="absolute bottom-3 right-3 z-[500] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-emerald-800 shadow hover:bg-emerald-50 disabled:opacity-60">
-                                    {locating ? 'Mencari lokasi…' : '◎ Gunakan Lokasi Saat Ini'}
-                                </button>
-                            </div>
-                            {coordinates && <p className="mt-2 text-xs text-slate-500">📍 {coordinates.latitude}, {coordinates.longitude} — {coordinates.district ? `Kecamatan ${coordinates.district}` : 'Titik berada di luar batas kecamatan Kota Malang'}</p>}
-                            <p className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Titik laporan terdahulu ({mapReports.length})</span><span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full border-2 border-blue-700 bg-blue-500" /> Lokasi laporan baru</span></p>
-                            <input type="hidden" name="latitude" value={coordinates?.latitude || ''} />
-                            <input type="hidden" name="longitude" value={coordinates?.longitude || ''} />
-                            <input type="hidden" name="district" value={coordinates?.district || ''} />
-                            <input type="hidden" name="district_id" value={coordinates?.district_id || ''} />
+                            <label className="text-sm font-semibold text-slate-700">
+                                Tingkat Keparahan
+                            </label>
+                            <select
+                                value={form.severity}
+                                onChange={(e) => updateField('severity', e.target.value)}
+                                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+                            >
+                                <option value="1">Rendah</option>
+                                <option value="2">Sedang</option>
+                                <option value="3">Tinggi</option>
+                            </select>
                         </div>
+                    </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-6">
+                    <h2 className="font-bold text-slate-900">Lokasi Kejadian</h2>
+
+                    <div className="mt-5 space-y-5">
                         <div>
-                            <label htmlFor="location_detail" className="text-sm font-semibold text-slate-700">Detail Lokasi <span className="text-red-500">*</span></label>
-                            <textarea id="location_detail" name="location_detail" required maxLength={70} rows={2} placeholder="Contoh: Depan SDN 01, sebelah minimarket, dekat lampu merah…" className={inputClass} />
-                            <p className="mt-1 text-xs text-slate-400">Maksimal 70 karakter. Jelaskan patokan agar petugas mudah menemukan lokasi.</p>
+                            <label className="text-sm font-semibold text-slate-700">
+                                Detail Lokasi
+                            </label>
+                            <input
+                                required
+                                value={form.location_detail}
+                                onChange={(e) => updateField('location_detail', e.target.value)}
+                                placeholder="Nama jalan, patokan, atau alamat..."
+                                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+                            />
                         </div>
+
                         <div>
-                            <label className="mb-3 block text-sm font-semibold text-slate-700">Tingkat Urgensi <span className="text-red-500">*</span></label>
-                            <div className="grid grid-cols-3 gap-3">
-                                {[{ value: '1', title: 'Rendah', sub: 'Informasi umum', style: 'has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50' }, { value: '2', title: 'Sedang', sub: 'Perlu perhatian', style: 'has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50' }, { value: '3', title: 'Mendesak', sub: 'Butuh penanganan', style: 'has-[:checked]:border-red-500 has-[:checked]:bg-red-50' }].map((item) => (
-                                    <label key={item.value} className={`cursor-pointer rounded-xl border p-3 text-center transition ${item.style}`}>
-                                        <input className="sr-only" type="radio" name="severity" value={item.value} defaultChecked={item.value === '1'} />
-                                        <span className="block text-sm font-bold text-slate-800">{item.title}</span>
-                                        <span className="mt-1 block text-[11px] text-slate-500">{item.sub}</span>
-                                    </label>
-                                ))}
+                            <label className="text-sm font-semibold text-slate-700">
+                                Kecamatan
+                            </label>
+                            <input
+                                value={form.district}
+                                onChange={(e) => updateField('district', e.target.value)}
+                                placeholder="Masukkan kecamatan..."
+                                className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-3"
+                            />
+                        </div>
+
+                        <div className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 p-6">
+                            <p className="font-semibold text-slate-800">
+                                Pinpoint Lokasi
+                            </p>
+                            <p className="mt-2 text-sm text-slate-500">
+                                Area peta interaktif akan ditambahkan pada integrasi Leaflet dan Turf.js.
+                            </p>
+
+                            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-600">Latitude</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        value={form.latitude}
+                                        onChange={(e) => updateField('latitude', e.target.value)}
+                                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-600">Longitude</label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        value={form.longitude}
+                                        onChange={(e) => updateField('longitude', e.target.value)}
+                                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="font-bold text-slate-900">Bukti Pendukung<span className="text-red-500">*</span></h2>
-                    <p className="mt-1 text-sm text-slate-500">Unggah 1–5 foto bukti dengan format JPG atau PNG. Ukuran maksimal 1 MB per foto.</p>
-                    <label className="mt-4 flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-5 text-center hover:bg-emerald-50">
-                        <span className="text-3xl text-emerald-700">＋</span>
-                        <span className="mt-2 text-sm font-semibold text-emerald-800">Pilih foto atau klik untuk mengunggah</span>
-                        <span className="mt-1 text-xs text-slate-500">JPG / PNG · Maksimal 5 foto</span>
-                        <input ref={fileInput} type="file" name="images[]" accept="image/jpeg,image/png" multiple required className="sr-only" onChange={(event) => addImages(event.target.files)} />
-                    </label>
-                    <p className="mt-2 text-xs text-slate-500">{images.length} dari 5 foto dipilih.</p>
-                    {imageError && <p className="mt-2 text-sm text-red-600">{imageError}</p>}
-                    {images.length > 0 && <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
-                        {images.map((file, index) => <div key={`${file.name}-${file.size}`} className="relative">
-                            <img src={previewUrls[index]} alt={`Pratinjau ${file.name}`} className="h-24 w-full rounded-lg border border-slate-200 object-cover" />
-                            <button type="button" onClick={() => removeImage(index)} aria-label={`Hapus ${file.name}`} className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white shadow">×</button>
-                            <p className="mt-1 truncate text-[10px] text-slate-500">{file.name}</p>
-                        </div>)}
-                    </div>}
+                <section className="rounded-2xl border border-slate-200 bg-white p-6">
+                    <h2 className="font-bold text-slate-900">Bukti Pendukung</h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                        Unggah maksimal 5 foto dengan format JPG atau PNG.
+                    </p>
+
+                    <input
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        multiple
+                        onChange={handleImages}
+                        className="mt-5 block w-full text-sm text-slate-600"
+                    />
+
+                    <p className="mt-2 text-xs text-slate-400">
+                        {form.images.length} dari 5 foto dipilih.
+                    </p>
                 </section>
 
-                {submitError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{submitError}</p>}
-
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <label className="flex cursor-pointer items-start gap-3">
-                        <input type="checkbox" name="is_anonymous" value="1" className="mt-1 h-4 w-4 accent-emerald-700" />
-                        <span><span className="block text-sm font-semibold text-slate-800">Kirim sebagai laporan anonim</span><span className="mt-1 block text-xs leading-relaxed text-slate-500">Nama dan foto profil Anda tidak akan ditampilkan kepada publik pada laporan ini.</span></span>
+                <section className="rounded-2xl border border-slate-200 bg-white p-6">
+                    <label className="flex items-start gap-3">
+                        <input
+                            type="checkbox"
+                            checked={form.anonymous}
+                            onChange={(e) => updateField('anonymous', e.target.checked)}
+                            className="mt-1"
+                        />
+                        <span>
+                            <span className="block text-sm font-semibold text-slate-800">
+                                Kirim sebagai laporan anonim
+                            </span>
+                            <span className="mt-1 block text-xs text-slate-500">
+                                Identitas pelapor tidak ditampilkan pada informasi publik laporan.
+                            </span>
+                        </span>
                     </label>
                 </section>
 
-                <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
-                    <Link to="/profile" className="rounded-xl border border-slate-300 px-6 py-3 text-center text-sm font-semibold text-slate-600 hover:bg-slate-50">Batal</Link>
-                    <button type="submit" disabled={submitting} className="rounded-xl bg-emerald-700 px-7 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{submitting ? 'Mengirim laporan…' : 'Kirim Laporan'}</button>
+                <div className="flex justify-end gap-3">
+                    <Link
+                        to="/reports"
+                        className="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
+                    >
+                        Batal
+                    </Link>
+
+                    <button
+                        type="submit"
+                        className="rounded-lg bg-emerald-700 px-6 py-3 text-sm font-semibold text-white"
+                    >
+                        Simpan Laporan
+                    </button>
                 </div>
             </form>
         </div>

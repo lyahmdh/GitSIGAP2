@@ -5,17 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 
-class User extends Authenticatable implements MustVerifyEmail
-{
+class User extends Authenticatable implements JWTSubject, MustVerifyEmail {
     use HasFactory, Notifiable;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role',
+        'role'
     ];
 
     protected $hidden = [
@@ -44,5 +44,15 @@ class User extends Authenticatable implements MustVerifyEmail
     public function projectUpdates()
     {
         return $this->hasMany(ProjectUpdate::class, 'admin_id');
+    }
+
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    public function getJWTCustomClaims()
+    {
+        return [];
     }
 }

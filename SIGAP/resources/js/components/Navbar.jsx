@@ -1,16 +1,12 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 
 function getInitials(name = '') {
     const parts = name.trim().split(/\s+/).filter(Boolean);
-
     if (parts.length === 0) return '?';
-
     const first = parts[0][0];
     const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
-
     return (first + last).toUpperCase();
 }
 
@@ -30,18 +26,11 @@ function UserMenu({ user, onLogout }) {
 
     useEffect(() => {
         const close = (event) => {
-            if (ref.current && !ref.current.contains(event.target)) {
-                setOpen(false);
-            }
+            if (ref.current && !ref.current.contains(event.target)) setOpen(false);
         };
-
-        const esc = (event) => {
-            if (event.key === 'Escape') setOpen(false);
-        };
-
+        const esc = (event) => event.key === 'Escape' && setOpen(false);
         document.addEventListener('mousedown', close);
         document.addEventListener('keydown', esc);
-
         return () => {
             document.removeEventListener('mousedown', close);
             document.removeEventListener('keydown', esc);
@@ -59,27 +48,12 @@ function UserMenu({ user, onLogout }) {
                 aria-expanded={open}
                 className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition hover:bg-white/10"
             >
-                <span className="flex h-[38px] w-[38px] items-center justify-center overflow-hidden rounded-full border-2 border-accent bg-accent text-sm font-bold text-white">
-                    {user.profile_photo ? (
-                        <img
-                            src={
-                                user.profile_photo.startsWith('http') ||
-                                user.profile_photo.startsWith('/')
-                                    ? user.profile_photo
-                                    : `/storage/${user.profile_photo}`
-                            }
-                            alt=""
-                            className="h-full w-full rounded-full object-cover"
-                        />
-                    ) : (
-                        getInitials(user.name)
-                    )}
+                <span className="flex h-[38px] w-[38px] items-center justify-center rounded-full border-2 border-accent bg-accent text-sm font-bold text-white">
+                    {getInitials(user.name)}
                 </span>
-
                 <span className="hidden max-w-[130px] truncate text-sm font-medium text-white lg:inline">
                     {user.name}
                 </span>
-
                 <span
                     aria-hidden="true"
                     className={`hidden text-[10px] text-white/70 transition-transform lg:inline ${
@@ -96,14 +70,9 @@ function UserMenu({ user, onLogout }) {
                     className="absolute right-0 z-50 mt-2 min-w-[210px] rounded-[14px] border border-cream-dark bg-white p-2 shadow-float"
                 >
                     <div className="px-3 py-2">
-                        <p className="truncate text-sm font-bold text-ink">
-                            {user.name}
-                        </p>
-                        <p className="truncate text-xs text-muted">
-                            {user.email}
-                        </p>
+                        <p className="truncate text-sm font-bold text-ink">{user.name}</p>
+                        <p className="truncate text-xs text-muted">{user.email}</p>
                     </div>
-
                     <div className="my-1.5 h-px bg-cream-dark" />
 
                     {isAdmin ? (
@@ -115,17 +84,25 @@ function UserMenu({ user, onLogout }) {
                             Dashboard Admin
                         </Link>
                     ) : (
-                        <Link
-                            role="menuitem"
-                            to="/profile"
-                            className="block rounded-lg px-3.5 py-2 text-sm font-medium text-ink hover:bg-cream"
-                        >
-                            Profil Saya
-                        </Link>
+                        <>
+                            <Link
+                                role="menuitem"
+                                to="/dashboard"
+                                className="block rounded-lg px-3.5 py-2 text-sm font-medium text-ink hover:bg-cream"
+                            >
+                                Dashboard
+                            </Link>
+                            <Link
+                                role="menuitem"
+                                to="/profile"
+                                className="block rounded-lg px-3.5 py-2 text-sm font-medium text-ink hover:bg-cream"
+                            >
+                                Profil Saya
+                            </Link>
+                        </>
                     )}
 
                     <div className="my-1.5 h-px bg-cream-dark" />
-
                     <button
                         type="button"
                         role="menuitem"
@@ -144,9 +121,7 @@ export default function Navbar() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-
     const [mobileOpen, setMobileOpen] = useState(false);
-    const isAdmin = user?.role === 'admin';
 
     useEffect(() => setMobileOpen(false), [location.pathname]);
 
@@ -162,23 +137,10 @@ export default function Navbar() {
     return (
         <header className="sticky top-0 z-40 bg-green-dark shadow-[0_2px_12px_rgba(0,0,0,0.25)]">
             <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
-                {/* Logo selalu berada di sebelah kiri */}
-                <Link
-                    to={isAdmin ? '/admin' : '/'}
-                    aria-label={isAdmin ? 'Dashboard Admin SIGAP' : 'Homepage SIGAP'}
-                    className="flex shrink-0 items-center gap-2 font-display text-2xl font-semibold tracking-wide text-white"
-                >
-                    <img
-                        src="/images/logo-sigap.svg"
-                        alt=""
-                        className="h-10 w-10 object-contain"
-                    />
-                    <span>
-                        <span className="text-accent">SI</span>GAP
-                    </span>
+                <Link to="/" className="font-display text-2xl font-semibold tracking-wide text-white">
+                    <span className="text-accent">SI</span>GAP
                 </Link>
 
-                {/* Tombol menu mobile */}
                 <button
                     type="button"
                     onClick={() => setMobileOpen((value) => !value)}
@@ -186,12 +148,7 @@ export default function Navbar() {
                     aria-expanded={mobileOpen}
                     className="rounded-lg border-[1.5px] border-white/40 px-2.5 py-1.5 text-white md:hidden"
                 >
-                    <svg
-                        width="22"
-                        height="22"
-                        viewBox="0 0 30 30"
-                        aria-hidden="true"
-                    >
+                    <svg width="22" height="22" viewBox="0 0 30 30" aria-hidden="true">
                         <path
                             stroke="currentColor"
                             strokeWidth="2"
@@ -204,50 +161,23 @@ export default function Navbar() {
                 <div
                     className={`${
                         mobileOpen ? 'flex' : 'hidden'
-                    } w-full flex-col gap-3 md:flex md:w-auto md:flex-1 md:flex-row md:items-center ${
-                        isAdmin
-                            ? 'md:justify-end'
-                            : 'md:justify-between'
-                    }`}
+                    } w-full flex-col gap-3 md:flex md:w-auto md:flex-1 md:flex-row md:items-center md:justify-between`}
                 >
-                    {/* Menu navigasi hanya untuk pengguna biasa */}
-                    {!isAdmin && (
-                        <nav className="flex flex-col gap-1 md:ml-4 md:flex-row">
-                            <NavLink
-                                to="/"
-                                end
-                                className={navLinkClass}
-                            >
-                                Home
-                            </NavLink>
+                    <nav className="flex flex-col gap-1 md:ml-4 md:flex-row">
+                        <NavLink to="/" end className={navLinkClass}>
+                            Home
+                        </NavLink>
+                        <NavLink to="/reports/create" className={navLinkClass}>
+                            Lapor
+                        </NavLink>
+                        <NavLink to="/laporan" className={navLinkClass}>
+                            Rekap
+                        </NavLink>
+                    </nav>
 
-                            <NavLink
-                                to="/reports/create"
-                                className={navLinkClass}
-                            >
-                                Lapor
-                            </NavLink>
-
-                            <NavLink
-                                to="/laporan"
-                                className={navLinkClass}
-                            >
-                                Rekap
-                            </NavLink>
-                        </nav>
-                    )}
-
-                    {/* Profil admin didorong ke sebelah kanan */}
-                    <div
-                        className={`flex items-center gap-2 ${
-                            isAdmin ? 'md:ml-auto md:justify-end' : ''
-                        }`}
-                    >
+                    <div className="flex items-center gap-2">
                         {user ? (
-                            <UserMenu
-                                user={user}
-                                onLogout={handleLogout}
-                            />
+                            <UserMenu user={user} onLogout={handleLogout} />
                         ) : (
                             <>
                                 <Link
@@ -256,7 +186,6 @@ export default function Navbar() {
                                 >
                                     Masuk
                                 </Link>
-
                                 <Link
                                     to="/register"
                                     className="rounded-full border-[1.5px] border-accent bg-accent px-5 py-1.5 text-sm font-bold text-white transition hover:border-brown-warm hover:bg-brown-warm"

@@ -1,6 +1,10 @@
 import { NavLink } from 'react-router-dom';
 
 const userMenus = [
+    { to: '/dashboard', label: 'Dashboard' },
+    { to: '/reports', label: 'Laporan Saya' },
+    { to: '/reports/create', label: 'Buat Laporan' },
+    { to: '/map', label: 'Peta Laporan' },
     { to: '/profile', label: 'Profil Saya' },
 ];
 
