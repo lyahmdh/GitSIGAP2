@@ -157,7 +157,7 @@ class AdminController extends Controller
 
         // ── Kirim email notifikasi ───────────────────────────────
         try {
-            if ($report->user?->email) {
+            if ($report->user?->email && $report->user->hasVerifiedEmail()) {
                 Mail::to($report->user->email)
                     ->send(new ReportStatusUpdatedMail($report));
             }

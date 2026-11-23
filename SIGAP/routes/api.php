@@ -48,7 +48,7 @@ Route::prefix('spa')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [SpaAuthController::class, 'me']);
         Route::get('/profile', [SpaProfileController::class, 'show']);
-        Route::post('/reports', [ReportController::class, 'store']);
+        Route::post('/reports', [ReportController::class, 'store'])->middleware('throttle:5,1');
         Route::delete('/reports/{id}', [ReportController::class, 'destroy']);
         Route::put('/profile', [SpaProfileController::class, 'update']);
         Route::delete('/profile/photo', [SpaProfileController::class, 'destroyPhoto']);
@@ -61,7 +61,7 @@ Route::prefix('spa')->group(function () {
         Route::post('/auth/logout', [SpaAuthController::class, 'logout']);
 
         // Komentar dari SPA menggunakan sesi Sanctum.
-        Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
+        Route::post('/reports/{id}/comments', [CommentController::class, 'store'])->middleware('throttle:10,1');
         Route::delete('/comments/{id}', [CommentController::class, 'destroy']);
 
         // ADMIN ROUTES UNTUK SPA (Sanctum session authentication).
@@ -76,7 +76,7 @@ Route::prefix('spa')->group(function () {
             Route::patch('/reports/{id}/status', [
                 ReportController::class,
                 'updateStatus',
-            ]);
+            ])->middleware('throttle:10,1');
 
             // Riwayat dan penambahan progres laporan.
             Route::get('/reports/{id}/updates', [
@@ -87,7 +87,7 @@ Route::prefix('spa')->group(function () {
             Route::post('/reports/{id}/updates', [
                 ProjectUpdateController::class,
                 'store',
-            ]);
+            ])->middleware('throttle:10,1');
 
             // Statistik admin.
             Route::get('/statistics', function () {

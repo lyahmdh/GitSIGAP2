@@ -343,14 +343,16 @@ class ReportController extends Controller
                 ])
             ], 201);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
 
             DB::rollBack();
 
+            // Detail teknis hanya dicatat di log server, bukan dikirim ke pengguna.
+            report($e);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membuat laporan',
-                'error' => $e->getMessage()
+                'message' => 'Gagal membuat laporan. Silakan coba kembali.',
             ], 500);
         }
     }
