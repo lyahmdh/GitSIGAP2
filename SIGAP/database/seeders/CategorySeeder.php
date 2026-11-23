@@ -2,16 +2,25 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Category;
 use Illuminate\Database\Seeder;
 
 class CategorySeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        //
+        $categories = [
+            ['name' => 'Jalan & Transportasi', 'report_radius' => 75],
+            ['name' => 'Air & Drainase', 'report_radius' => 100],
+            ['name' => 'Ruang Publik', 'report_radius' => 80],
+            ['name' => 'Penerangan Umum', 'report_radius' => 40],
+        ];
+
+        foreach ($categories as $category) {
+            Category::updateOrCreate(
+                ['name' => $category['name']],
+                ['report_radius' => $category['report_radius']]
+            );
+        }
     }
 }

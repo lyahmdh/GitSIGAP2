@@ -13,6 +13,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Aktifkan session/cookie authentication untuk first-party SPA (Sanctum).
+        $middleware->statefulApi();
+                
         // Alias middleware custom kamu
         $middleware->alias([
             'admin' => AdminMiddleware::class,

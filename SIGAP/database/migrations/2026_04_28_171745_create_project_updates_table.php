@@ -13,7 +13,7 @@ return new class extends Migration
 
             $table->foreignId('report_id')
                 ->constrained()
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
             // admin yang membuat update
             $table->foreignId('admin_id')

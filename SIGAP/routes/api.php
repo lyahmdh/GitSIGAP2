@@ -2,10 +2,12 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\ProjectUpdateController;
+use App\Http\Controllers\Api\SpaAuthController;
 
 // PUBLIC ROUTES
 Route::prefix('auth')->group(function () {
@@ -15,6 +17,7 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::get('/reports', [ReportController::class, 'index']);
+Route::get('/reports/stats/districts', [ReportController::class, 'districtStats']);
 Route::get('/reports/{id}', [ReportController::class, 'show']);
 
 // komentar publik (lihat komentar)
@@ -112,5 +115,28 @@ Route::prefix('admin')->middleware(['auth:api', 'admin'])->group(function () {
                 ->groupBy('district')
                 ->get(),
         ]);
+    });
+});
+// FIRST-PARTY REACT SPA (Sanctum cookie/session authentication).
+// JWT endpoints di atas dipertahankan sementara untuk kompatibilitas selama migrasi.
+Route::prefix('spa')->group(function () {
+    Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
+        Route::post('/register', [SpaAuthController::class, 'register']);
+        Route::post('/login', [SpaAuthController::class, 'login']);
+    });
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/auth/me', [SpaAuthController::class, 'me']);
+
+        Route::post('/auth/email/verification-notification', [
+            SpaAuthController::class,
+            'resendVerification',
+        ])->middleware('throttle:6,1');
+
+        Route::post('/auth/logout', [SpaAuthController::class, 'logout']);
+
+        // Komentar dari SPA (sesi Sanctum). Versi JWT di atas tetap ada selama migrasi.
+        Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
+        Route::delete('/comments/{id}', [CommentController::class, 'destroy']);
     });
 });
