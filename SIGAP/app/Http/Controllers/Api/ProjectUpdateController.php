@@ -1,63 +1,115 @@
 <?php
 
-
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ProjectUpdateCreatedMail;
 use App\Http\Requests\ProjectUpdate\StoreProjectUpdateRequest;
 use App\Models\ProjectUpdate;
 use App\Models\ProjectUpdateImage;
+use App\Models\Report;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ProjectUpdateController extends Controller
 {
-    public function store(StoreProjectUpdateRequest $request, $id)    
+    /**
+     * Mengambil riwayat progres sebuah laporan secara kronologis.
+     */
+    public function index(string $id): JsonResponse
     {
-        $validated = $request->validated();
+        $report = Report::query()->findOrFail($id);
 
-        DB::beginTransaction();
+        $updates = ProjectUpdate::query()
+            ->with([
+                'images:id,project_update_id,image_path',
+                'admin:id,name',
+            ])
+            ->where('report_id', $report->id)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $updates,
+        ]);
+    }
+
+    /**
+     * Menambahkan progres laporan beserta maksimal lima foto dokumentasi.
+     */
+    public function store(StoreProjectUpdateRequest $request, string $id): JsonResponse
+    {
+        $report = Report::query()->findOrFail($id);
+        $validated = $request->validated();
+        $storedPaths = [];
 
         try {
+            $update = DB::transaction(function () use ($validated, $request, $report, &$storedPaths) {
+                $update = ProjectUpdate::create([
+                    'report_id' => $report->id,
+                    'admin_id' => $request->user()->id,
+                    'title' => $validated['title'],
+                    'description' => $validated['description'],
+                ]);
 
-            $update = ProjectUpdate::create([
-                'report_id' => $id,
-                'admin_id' => auth()->id(),
-                'title' => $validated['title'],
-                'description' => $validated['description']
-            ]);
+                foreach ($validated['images'] ?? [] as $image) {
+                    $path = $image->store('project-updates', 'public');
 
-            if (!empty($validated['images'])) {
+                    if (!$path) {
+                        throw new \RuntimeException('Foto dokumentasi gagal disimpan.');
+                    }
 
-                foreach ($validated['images'] as $image) {
-
-                    $path = $image->store(
-                        'project-updates',
-                        'public'
-                    );
+                    $storedPaths[] = $path;
 
                     ProjectUpdateImage::create([
                         'project_update_id' => $update->id,
-                        'image_path' => $path
+                        'image_path' => $path,
+                    ]);
+                }
+
+                return $update->load([
+                    'images:id,project_update_id,image_path',
+                    'admin:id,name',
+                ]);
+            });
+
+            // Email progres hanya dikirim kepada pelapor yang sudah memverifikasi email.
+            $update->load('report.user');
+            $reporter = $update->report?->user;
+
+            if ($reporter && $reporter->email && $reporter->hasVerifiedEmail()) {
+                try {
+                    Mail::to($reporter->email)->send(new ProjectUpdateCreatedMail($update));
+                } catch (Throwable $mailException) {
+                    Log::error('Email notifikasi update proyek gagal dikirim', [
+                        'report_id' => $report->id,
+                        'project_update_id' => $update->id,
+                        'error' => $mailException->getMessage(),
                     ]);
                 }
             }
 
-            DB::commit();
-
             return response()->json([
                 'success' => true,
-                'message' => 'Update proyek berhasil dibuat',
-                'data' => $update->load('images')
+                'message' => 'Pembaruan progres berhasil disimpan.',
+                'data' => $update,
             ], 201);
+        } catch (Throwable $exception) {
+            if ($storedPaths !== []) {
+                Storage::disk('public')->delete($storedPaths);
+            }
 
-        } catch (\Exception $e) {
-
-            DB::rollBack();
+            report($exception);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal membuat update proyek',
-                'error' => $e->getMessage()
+                'message' => 'Pembaruan progres gagal disimpan. Silakan coba kembali.',
             ], 500);
         }
     }

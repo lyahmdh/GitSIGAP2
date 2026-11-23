@@ -35,13 +35,7 @@ class SpaAuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Registrasi berhasil. Silakan periksa email untuk verifikasi akun.',
-            'user' => $user->only([
-                'id',
-                'name',
-                'email',
-                'role',
-                'email_verified_at',
-            ]),
+            'user' => $this->userPayload($user),
         ], 201);
     }
 
@@ -71,13 +65,7 @@ class SpaAuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil.',
-            'user' => $user->only([
-                'id',
-                'name',
-                'email',
-                'role',
-                'email_verified_at',
-            ]),
+            'user' => $this->userPayload($user),
         ]);
     }
 
@@ -90,13 +78,7 @@ class SpaAuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'user' => $user->only([
-                'id',
-                'name',
-                'email',
-                'role',
-                'email_verified_at',
-            ]),
+            'user' => $this->userPayload($user),
         ]);
     }
 
@@ -138,5 +120,20 @@ class SpaAuthController extends Controller
             'success' => true,
             'message' => 'Logout berhasil.',
         ]);
+    }
+
+    private function userPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'email_verified_at' => $user->email_verified_at,
+            'created_at' => $user->created_at,
+            'profile_photo' => $user->profile_photo
+                ? '/storage/' . ltrim($user->profile_photo, '/')
+                : null,
+        ];
     }
 }
