@@ -11,8 +11,18 @@ class CommentController extends Controller
 {
     public function index($id)
     {
+        // Komentar hanya dapat dilihat jika laporan tersedia dan bukan laporan ditolak.
+        $report = Report::find($id);
+
+        if (!$report || $report->status === 'ditolak') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Report tidak ditemukan'
+            ], 404);
+        }
+
         $comments = Comment::with('user:id,name,profile_photo')
-            ->where('report_id', $id)
+            ->where('report_id', $report->id)
             ->latest()
             ->get();
 

@@ -1,25 +1,16 @@
 import { Link } from 'react-router-dom';
 
-const aboutLinks = ['Profil SIGAP', 'Keamanan', 'Hubungi Kami', 'FAQ'];
+const aboutLinks = [
+    ['Profil SIGAP', '/#tentang-sigap'],
+    ['Fitur SIGAP', '/#fitur-sigap'],
+    ['Cara Kerja SIGAP', '/#cara-kerja'],
+    ['FAQ', '/#faq'],
+];
 
 const quickLinks = [
+    ['Homepage', '/'],
     ['Rekap Laporan Publik', '/laporan'],
-    ['Monitoring Proyek', '/laporan'],
-    ['Laporan Warga', '/laporan'],
     ['Buat Laporan Baru', '/reports/create'],
-];
-
-const socials = [
-    ['X', 'Twitter/X'],
-    ['IG', 'Instagram'],
-    ['YT', 'YouTube'],
-    ['in', 'LinkedIn'],
-];
-
-const contacts = [
-    ['✉', 'sigap@pemerintah.go.id'],
-    ['☎', '(0341) 123-4567'],
-    ['⌖', 'Jl. Veteran No. 1, Malang, Jawa Timur'],
 ];
 
 const linkClass = 'block text-sm text-white/65 transition hover:text-accent';
@@ -40,17 +31,6 @@ export default function Footer() {
                             Platform digital untuk melaporkan dan memantau kondisi fasilitas publik secara
                             transparan, agar pemerintah dapat menindaklanjuti dengan lebih cepat dan terukur.
                         </p>
-                        <div className="mt-4 flex gap-1.5">
-                            {socials.map(([label, title]) => (
-                                <span
-                                    key={title}
-                                    title={title}
-                                    className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white/75 transition hover:bg-accent hover:text-white"
-                                >
-                                    {label}
-                                </span>
-                            ))}
-                        </div>
                     </div>
 
                     <div className="lg:col-span-2">
@@ -58,10 +38,8 @@ export default function Footer() {
                             Tentang Kami
                         </p>
                         <ul className="space-y-2">
-                            {aboutLinks.map((label) => (
-                                <li key={label} className={linkClass}>
-                                    {label}
-                                </li>
+                            {aboutLinks.map(([label, to]) => (
+                                <li key={label}><Link to={to} className={linkClass}>{label}</Link></li>
                             ))}
                         </ul>
                     </div>
@@ -72,11 +50,7 @@ export default function Footer() {
                         </p>
                         <ul className="space-y-2">
                             {quickLinks.map(([label, to]) => (
-                                <li key={label}>
-                                    <Link to={to} className={linkClass}>
-                                        {label}
-                                    </Link>
-                                </li>
+                                <li key={label}><Link to={to} className={linkClass}>{label}</Link></li>
                             ))}
                         </ul>
                     </div>
@@ -85,15 +59,13 @@ export default function Footer() {
                         <p className="mb-4 text-sm font-bold uppercase tracking-[0.08em] text-white">
                             Kontak
                         </p>
-                        <ul className="space-y-2.5">
-                            {contacts.map(([icon, text]) => (
-                                <li key={text} className="flex items-start gap-2 text-[13.5px] text-white/60">
-                                    <span aria-hidden="true" className="mt-0.5 text-accent">
-                                        {icon}
-                                    </span>
-                                    <span>{text}</span>
-                                </li>
-                            ))}
+                        <ul className="space-y-2.5 text-[13.5px] text-white/60">
+                            <li className="flex items-start gap-2">
+                                <a href="mailto:sigapheadoffice@gmail.com" className="hover:text-accent">sigapheadoffice@gmail.com</a>
+                            </li>
+                            <li className="flex items-start gap-2">
+                                <span>Jl. Veteran No. 1, Malang, Jawa Timur</span>
+                            </li>
                         </ul>
                     </div>
                 </div>

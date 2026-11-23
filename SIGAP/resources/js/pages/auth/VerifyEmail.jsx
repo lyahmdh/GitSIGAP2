@@ -145,10 +145,10 @@ export default function VerifyEmail() {
                 {verified && (
                     <button
                         type="button"
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => navigate('/profile')}
                         className="btn-accent mt-7 w-full"
                     >
-                        Lanjut ke Dashboard
+                        Lanjut ke Profil
                     </button>
                 )}
             </div>
