@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import api from '../../services/api';
 
 const HERO_IMG = 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1600&q=80';
 const ABOUT_IMG = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&q=80';
 
-const defaultStats = { total: 128, aktif: 42, selesai: 74, diterima: 312 };
 
 const aboutPoints = [
     ['Laporan Terstruktur', 'Dilengkapi foto, peta, dan tingkat keparahan'],
@@ -120,7 +120,30 @@ function Faq() {
     );
 }
 
-export default function Home({ stats = defaultStats, isLoggedIn = false }) {
+export default function Home({ isLoggedIn = false }) {
+    const location = useLocation();
+    const [stats, setStats] = useState({ total: 0, aktif: 0, selesai: 0, diterima: 0 });
+
+    useEffect(() => {
+        let active = true;
+        api.get('/api/public/home-stats')
+            .then(({ data }) => {
+                if (active && data?.success && data.data) setStats(data.data);
+            })
+            .catch((error) => {
+                console.error('Statistik homepage gagal dimuat:', error);
+            });
+        return () => { active = false; };
+    }, []);
+
+    useEffect(() => {
+        if (!location.hash) return;
+        const targetId = decodeURIComponent(location.hash.slice(1));
+        requestAnimationFrame(() => {
+            document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
+        });
+    }, [location.hash]);
+
     const statItems = [
         ['Total Laporan', stats.total],
         ['Proyek Aktif', stats.aktif],
@@ -205,7 +228,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* TENTANG */}
-            <section className="mx-auto max-w-7xl px-6 py-24">
+            <section id="tentang-sigap" className="scroll-mt-24 mx-auto max-w-7xl px-6 py-24">
                 <div className="grid items-center gap-12 lg:grid-cols-12">
                     <div className="lg:col-span-5">
                         <div className="relative overflow-hidden rounded-3xl shadow-2xl">
@@ -258,7 +281,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* FITUR */}
-            <section className="bg-white py-20">
+            <section id="fitur-sigap" className="scroll-mt-24 bg-white py-20">
                 <div className="mx-auto max-w-7xl px-6">
                     <SectionHeading center eyebrow="Mengapa SIGAP?" title="Fitur yang Membuat Perbedaan" />
 
@@ -281,7 +304,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* CARA KERJA */}
-            <section className="bg-cream py-20">
+            <section id="cara-kerja" className="scroll-mt-24 bg-cream py-20">
                 <div className="mx-auto max-w-7xl px-6">
                     <SectionHeading center eyebrow="Alur Penggunaan" title="Bagaimana Cara Kerjanya?" />
 
@@ -303,7 +326,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* FAQ */}
-            <section className="bg-cream pb-24">
+            <section id="faq" className="scroll-mt-24 bg-cream pb-24">
                 <div className="mx-auto max-w-7xl px-6">
                     <SectionHeading center eyebrow="Pertanyaan Umum" title="Frequently Asked Questions" />
                     <Faq />

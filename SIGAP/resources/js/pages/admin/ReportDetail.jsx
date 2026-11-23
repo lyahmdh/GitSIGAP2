@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import reportService from '../../services/reportService';
 import { formatDateLong, storageUrl } from '../../utils/format';
 import Loading from '../../components/Loading';
+import ReadOnlyMap from '../../components/report/ReadOnlyMap';
 
 const statusOrder = ['masuk', 'diverifikasi', 'ditindaklanjuti', 'selesai'];
 const statusLabels = {
@@ -308,8 +309,25 @@ export default function AdminReportDetail() {
                     <section className="rounded-xl border border-cream-dark bg-white p-5 md:p-7">
                         <h2 className="mb-4 flex items-center gap-2 font-display text-xl font-semibold"><span className="text-accent">⌖</span> Deskripsi Proyek</h2>
                         <p className="whitespace-pre-line text-sm leading-7 text-muted">{report.description || '-'}</p>
-                        <div className="mt-5 flex min-h-28 items-center justify-center rounded-lg border border-dashed border-cream-dark bg-cream px-4 text-center text-sm text-muted">Lokasi laporan<br /><span className="mt-1 block text-xs">{location}</span></div>
-                        <p className="mt-3 text-xs text-muted">⌖ {location}</p>
+                        <div className="mt-5">
+                            <h3 className="mb-2 text-sm font-semibold">Lokasi Laporan</h3>
+                            {report.latitude !== null && report.latitude !== undefined &&
+                             report.longitude !== null && report.longitude !== undefined &&
+                             Number.isFinite(Number(report.latitude)) && Number.isFinite(Number(report.longitude)) ? (
+                                <ReadOnlyMap
+                                    latitude={report.latitude}
+                                    longitude={report.longitude}
+                                    title={report.title}
+                                    address={location}
+                                    className="h-72 w-full"
+                                />
+                            ) : (
+                                <div className="flex min-h-28 items-center justify-center rounded-lg border border-dashed border-cream-dark bg-cream px-4 text-center text-sm text-muted">
+                                    Koordinat lokasi laporan belum tersedia.
+                                </div>
+                            )}
+                            <p className="mt-3 text-xs text-muted">⌖ {location}</p>
+                        </div>
                     </section>
 
                     <section className="rounded-xl border border-cream-dark bg-white p-5 md:p-7">

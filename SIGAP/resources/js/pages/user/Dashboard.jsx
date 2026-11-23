@@ -13,8 +13,8 @@ export default function Dashboard() {
 
     const loadReports = useCallback(async () => {
         try {
-            const { data } = await api.get('/profile/riwayat/filter');
-            setReports(Array.isArray(data) ? data : data.data || []);
+            const { data } = await api.get('/api/spa/profile');
+            setReports(data.reports || []);
             setError('');
         } catch (err) {
             setError(err.response?.data?.message || 'Data dashboard gagal dimuat. Pastikan Anda sudah login.');

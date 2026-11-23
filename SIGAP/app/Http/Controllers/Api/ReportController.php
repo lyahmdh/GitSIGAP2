@@ -471,7 +471,7 @@ class ReportController extends Controller
 
         // Email hanya dikirim setelah transaksi database berhasil.
         // Kegagalan email tidak membatalkan perubahan status yang sudah tersimpan.
-        if ($report->user && $report->user->email) {
+        if ($report->user && $report->user->email && $report->user->hasVerifiedEmail()) {
             try {
                 Mail::to($report->user->email)
                     ->send(new ReportStatusUpdatedMail($report));

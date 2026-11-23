@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ProjectUpdateCreatedMail;
 use App\Http\Requests\ProjectUpdate\StoreProjectUpdateRequest;
 use App\Models\ProjectUpdate;
 use App\Models\ProjectUpdateImage;
 use App\Models\Report;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
 
@@ -75,6 +78,22 @@ class ProjectUpdateController extends Controller
                     'admin:id,name',
                 ]);
             });
+
+            // Email progres hanya dikirim kepada pelapor yang sudah memverifikasi email.
+            $update->load('report.user');
+            $reporter = $update->report?->user;
+
+            if ($reporter && $reporter->email && $reporter->hasVerifiedEmail()) {
+                try {
+                    Mail::to($reporter->email)->send(new ProjectUpdateCreatedMail($update));
+                } catch (Throwable $mailException) {
+                    Log::error('Email notifikasi update proyek gagal dikirim', [
+                        'report_id' => $report->id,
+                        'project_update_id' => $update->id,
+                        'error' => $mailException->getMessage(),
+                    ]);
+                }
+            }
 
             return response()->json([
                 'success' => true,
