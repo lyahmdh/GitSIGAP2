@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import api from '../../services/api';
 
 const HERO_IMG = 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1600&q=80';
 const ABOUT_IMG = 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&q=80';
 
-const defaultStats = { total: 128, aktif: 42, selesai: 74, diterima: 312 };
 
 const aboutPoints = [
     ['Laporan Terstruktur', 'Dilengkapi foto, peta, dan tingkat keparahan'],
@@ -14,20 +14,104 @@ const aboutPoints = [
 ];
 
 const features = [
-    ['👁️', 'Transparansi Dana & Proyek', 'Masyarakat dapat memantau penggunaan dana secara terbuka, mulai dari anggaran hingga progres pembangunan di lapangan.'],
-    ['💰', 'Pengelolaan Dana Efisien', 'Membantu pemerintah mengelola proyek, laporan, dan anggaran secara lebih terstruktur dengan dashboard yang informatif.'],
-    ['📈', 'Monitoring Proyek Real-time', 'Pantau perkembangan proyek secara real-time, termasuk progres pekerjaan dan status pembangunan yang sedang berjalan.'],
-    ['👥', 'Partisipasi Warga', 'Mendorong warga untuk aktif berpartisipasi dalam mengawasi dan mendukung pembangunan melalui laporan dan komentar.'],
-    ['📱', 'Laporan Warga Mudah', 'Warga dapat melaporkan berbagai permasalahan fasilitas dengan mudah dan cepat, dilengkapi peta interaktif dan foto bukti.'],
-    ['ℹ️', 'Akses Informasi Terpusat', 'Informasi terkait proyek pembangunan dan anggaran dapat diakses masyarakat secara mudah dalam satu platform terpadu.'],
+    ['eye', 'Transparansi Dana & Proyek', 'Masyarakat dapat memantau penggunaan dana secara terbuka, mulai dari anggaran hingga progres pembangunan di lapangan.'],
+    ['wallet', 'Pengelolaan Dana Efisien', 'Membantu pemerintah mengelola proyek, laporan, dan anggaran secara lebih terstruktur dengan dashboard yang informatif.'],
+    ['chart', 'Monitoring Proyek Real-time', 'Pantau perkembangan proyek secara real-time, termasuk progres pekerjaan dan status pembangunan yang sedang berjalan.'],
+    ['users', 'Partisipasi Warga', 'Mendorong warga untuk aktif berpartisipasi dalam mengawasi dan mendukung pembangunan melalui laporan dan komentar.'],
+    ['phone', 'Laporan Warga Mudah', 'Warga dapat melaporkan berbagai permasalahan fasilitas dengan mudah dan cepat, dilengkapi peta interaktif dan foto bukti.'],
+    ['info', 'Akses Informasi Terpusat', 'Informasi terkait proyek pembangunan dan anggaran dapat diakses masyarakat secara mudah dalam satu platform terpadu.'],
 ];
 
 const steps = [
-    ['✏️', '01', 'Buat Laporan', 'Isi formulir laporan lengkap dengan foto bukti, pilih lokasi di peta, dan tentukan tingkat keparahan kerusakan.'],
-    ['🔍', '02', 'Verifikasi Admin', 'Admin meninjau laporan masuk. Laporan valid akan diverifikasi dan masuk ke antrean penanganan berdasarkan priority score.'],
-    ['🛠️', '03', 'Tindak Lanjut', 'Pemerintah menindaklanjuti laporan dengan prioritas tertinggi. Progress ditambahkan secara berkala disertai foto lapangan.'],
-    ['✅', '04', 'Selesai & Laporan', 'Setelah perbaikan selesai, status diupdate ke "Selesai" dan warga menerima notifikasi email konfirmasi.'],
+    ['pencil', '01', 'Buat Laporan', 'Isi formulir laporan lengkap dengan foto bukti, pilih lokasi di peta, dan tentukan tingkat keparahan kerusakan.'],
+    ['search', '02', 'Verifikasi Admin', 'Admin meninjau laporan masuk. Laporan valid akan diverifikasi dan masuk ke antrean penanganan berdasarkan priority score.'],
+    ['wrench', '03', 'Tindak Lanjut', 'Pemerintah menindaklanjuti laporan dengan prioritas tertinggi. Progress ditambahkan secara berkala disertai foto lapangan.'],
+    ['check', '04', 'Selesai & Laporan', 'Setelah perbaikan selesai, status diupdate ke "Selesai" dan warga menerima notifikasi email konfirmasi.'],
 ];
+
+
+function LineIcon({ name, className = 'h-7 w-7' }) {
+    const common = {
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: 1.8,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+    };
+
+    const icons = {
+        eye: (
+            <>
+                <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                <circle cx="12" cy="12" r="2.7" />
+            </>
+        ),
+        wallet: (
+            <>
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M3 8h18M16 14h2" />
+            </>
+        ),
+        chart: (
+            <>
+                <path d="M3 3v18h18" />
+                <path d="m7 14 4-4 3 3 6-7" />
+            </>
+        ),
+        users: (
+            <>
+                <circle cx="9" cy="8" r="3" />
+                <path d="M3 20v-1.5A4.5 4.5 0 0 1 7.5 14h3a4.5 4.5 0 0 1 4.5 4.5V20" />
+                <path d="M16 5.2a3 3 0 0 1 0 5.6M18 14.2a4.5 4.5 0 0 1 3 4.3V20" />
+            </>
+        ),
+        phone: (
+            <>
+                <rect x="6" y="2" width="12" height="20" rx="2" />
+                <path d="M10 18h4" />
+            </>
+        ),
+        info: (
+            <>
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v5M12 8h.01" />
+            </>
+        ),
+        pencil: (
+            <>
+                <path d="m15 5 4 4M4 20l4-.8L19 8a2.1 2.1 0 0 0-3-3L5 16l-1 4Z" />
+            </>
+        ),
+        search: (
+            <>
+                <circle cx="10.8" cy="10.8" r="6.8" />
+                <path d="m16 16 5 5" />
+            </>
+        ),
+        wrench: (
+            <>
+                <path d="M14.5 6.5a5 5 0 0 0-6.4 6.4L3 18l3 3 5.1-5.1a5 5 0 0 0 6.4-6.4L14 13l-3-3 3.5-3.5Z" />
+            </>
+        ),
+        check: (
+            <>
+                <circle cx="12" cy="12" r="9" />
+                <path d="m8 12 2.5 2.5L16.5 9" />
+            </>
+        ),
+    };
+
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            className={className}
+            aria-hidden="true"
+            {...common}
+        >
+            {icons[name]}
+        </svg>
+    );
+}
 
 const faqs = [
     ['Bagaimana cara melaporkan masalah fasilitas publik?', 'Klik tombol "Buat Laporan" di beranda atau menu "Lapor". Anda perlu masuk akun terlebih dahulu. Isi formulir dengan judul, deskripsi, foto bukti (maks. 5 foto), pilih lokasi di peta, dan tentukan tingkat keparahan. Laporan akan langsung masuk ke sistem.'],
@@ -120,7 +204,30 @@ function Faq() {
     );
 }
 
-export default function Home({ stats = defaultStats, isLoggedIn = false }) {
+export default function Home({ isLoggedIn = false }) {
+    const location = useLocation();
+    const [stats, setStats] = useState({ total: 0, aktif: 0, selesai: 0, diterima: 0 });
+
+    useEffect(() => {
+        let active = true;
+        api.get('/api/public/home-stats')
+            .then(({ data }) => {
+                if (active && data?.success && data.data) setStats(data.data);
+            })
+            .catch((error) => {
+                console.error('Statistik homepage gagal dimuat:', error);
+            });
+        return () => { active = false; };
+    }, []);
+
+    useEffect(() => {
+        if (!location.hash) return;
+        const targetId = decodeURIComponent(location.hash.slice(1));
+        requestAnimationFrame(() => {
+            document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
+        });
+    }, [location.hash]);
+
     const statItems = [
         ['Total Laporan', stats.total],
         ['Proyek Aktif', stats.aktif],
@@ -142,7 +249,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
                 <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-20 pt-24">
                     <div className="max-w-2xl">
                         <div className="animate-fade-up mb-5 inline-flex items-center gap-2 rounded-full border border-accent/35 bg-accent/20 px-3.5 py-1.5 text-xs font-bold uppercase tracking-widest text-accent">
-                            <span aria-hidden="true">🛡️</span> Platform Aduan Fasilitas Publik
+                            Platform Aduan Fasilitas Publik
                         </div>
 
                         <h1
@@ -170,13 +277,13 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
                                 to="/reports/create"
                                 className="inline-flex items-center gap-2 rounded-lg bg-accent px-8 py-3.5 font-bold text-white shadow-lg shadow-accent/35 transition hover:-translate-y-0.5 hover:bg-brown-warm"
                             >
-                                📣 Buat Laporan
+                                Buat Laporan
                             </Link>
                             <Link
                                 to="/laporan"
                                 className="inline-flex items-center gap-2 rounded-lg border-2 border-white/45 px-7 py-3.5 font-semibold text-white transition hover:border-white hover:bg-white/10"
                             >
-                                📋 Lihat Semua Proyek
+                                Lihat Semua Proyek
                             </Link>
                         </div>
                     </div>
@@ -205,7 +312,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* TENTANG */}
-            <section className="mx-auto max-w-7xl px-6 py-24">
+            <section id="tentang-sigap" className="scroll-mt-24 mx-auto max-w-7xl px-6 py-24">
                 <div className="grid items-center gap-12 lg:grid-cols-12">
                     <div className="lg:col-span-5">
                         <div className="relative overflow-hidden rounded-3xl shadow-2xl">
@@ -216,7 +323,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
                                 loading="lazy"
                             />
                             <div className="absolute bottom-6 left-6 flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-bold text-white">
-                                🏅 Transparan &amp; Akuntabel
+                                Transparan &amp; Akuntabel
                             </div>
                         </div>
                     </div>
@@ -258,7 +365,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* FITUR */}
-            <section className="bg-white py-20">
+            <section id="fitur-sigap" className="scroll-mt-24 bg-white py-20">
                 <div className="mx-auto max-w-7xl px-6">
                     <SectionHeading center eyebrow="Mengapa SIGAP?" title="Fitur yang Membuat Perbedaan" />
 
@@ -269,8 +376,8 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
                                 className="group relative overflow-hidden rounded-2xl border border-cream-dark bg-cream p-7 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
                             >
                                 <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-green-light to-accent opacity-0 transition-opacity group-hover:opacity-100" />
-                                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-green-pale to-green-light/15 text-2xl">
-                                    {icon}
+                                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-green-pale to-green-light/15 text-green-dark">
+                                    <LineIcon name={icon} className="h-7 w-7" />
                                 </div>
                                 <h3 className="mb-2 text-[17px] font-bold text-green-dark">{title}</h3>
                                 <p className="text-sm leading-7 text-muted">{desc}</p>
@@ -281,15 +388,15 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* CARA KERJA */}
-            <section className="bg-cream py-20">
+            <section id="cara-kerja" className="scroll-mt-24 bg-cream py-20">
                 <div className="mx-auto max-w-7xl px-6">
                     <SectionHeading center eyebrow="Alur Penggunaan" title="Bagaimana Cara Kerjanya?" />
 
                     <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
                         {steps.map(([icon, num, title, desc]) => (
                             <div key={num} className="p-3 text-center">
-                                <div className="mx-auto mb-4 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-gradient-to-br from-green-light to-green-light text-3xl shadow-lg shadow-green-mid/30">
-                                    {icon}
+                                <div className="mx-auto mb-4 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-gradient-to-br from-green-light to-green-light text-white shadow-lg shadow-green-mid/30">
+                                    <LineIcon name={icon} className="h-8 w-8" />
                                 </div>
                                 <div className="mb-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-accent">
                                     Langkah {num}
@@ -303,7 +410,7 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
             </section>
 
             {/* FAQ */}
-            <section className="bg-cream pb-24">
+            <section id="faq" className="scroll-mt-24 bg-cream pb-24">
                 <div className="mx-auto max-w-7xl px-6">
                     <SectionHeading center eyebrow="Pertanyaan Umum" title="Frequently Asked Questions" />
                     <Faq />
@@ -327,13 +434,13 @@ export default function Home({ stats = defaultStats, isLoggedIn = false }) {
                             to={isLoggedIn ? '/reports/create' : '/register'}
                             className="inline-flex items-center gap-2 rounded-lg bg-accent px-8 py-3.5 font-bold text-white shadow-lg shadow-accent/35 transition hover:-translate-y-0.5 hover:bg-brown-warm"
                         >
-                            {isLoggedIn ? '📣 Buat Laporan' : '➕ Daftar Sekarang'}
+                            {isLoggedIn ? 'Buat Laporan' : 'Daftar Sekarang'}
                         </Link>
                         <Link
                             to="/laporan"
                             className="inline-flex items-center gap-2 rounded-lg border-2 border-white/45 px-7 py-3.5 font-semibold text-white transition hover:border-white hover:bg-white/10"
                         >
-                            🔎 {isLoggedIn ? 'Lihat Rekap Laporan' : 'Lihat Laporan Publik'}
+                            {isLoggedIn ? 'Lihat Rekap Laporan' : 'Lihat Laporan Publik'}
                         </Link>
                     </div>
                 </div>

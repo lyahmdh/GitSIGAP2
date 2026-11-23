@@ -13,6 +13,7 @@ class Report extends Model
     protected $fillable = [
         'user_id',
         'category_id',
+        'district_id',
         'title',
         'description',
         'severity',
@@ -37,6 +38,11 @@ class Report extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function districtRecord()
+    {
+        return $this->belongsTo(District::class, 'district_id');
     }
 
     public function category()

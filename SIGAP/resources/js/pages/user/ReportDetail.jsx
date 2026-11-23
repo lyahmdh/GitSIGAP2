@@ -9,8 +9,8 @@ export default function ReportDetail() {
         <ReportDetailView
             reportId={id}
             variant="dashboard"
-            backTo="/reports"
-            backLabel="Laporan Saya"
+            backTo="/profile"
+            backLabel="Profil Saya"
         />
     );
 }

@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -18,6 +19,10 @@ return new class extends Migration
             $table->foreignId('category_id')
                 ->constrained()
                 ->restrictOnDelete();
+                
+            $table->foreignId('district_id')
+                ->constrained('districts')
+                ->restrictOnDelete();
 
             $table->string('title', 150);
 
@@ -37,15 +42,17 @@ return new class extends Migration
                 'ditolak'
             ])->default('masuk');
 
+            // Detail lokasi yang diinput pelapor
             $table->string('location_detail', 255);
 
+            // Kecamatan hasil deteksi koordinat pinpoint peta
             $table->string('district', 100);
-            $table->string('subdistrict', 100);
 
+            // Koordinat hasil pinpoint pada peta
             $table->decimal('latitude', 10, 8);
-
             $table->decimal('longitude', 11, 8);
 
+            // Skor prioritas laporan
             $table->decimal('priority_score', 5, 2)
                 ->default(0);
 
