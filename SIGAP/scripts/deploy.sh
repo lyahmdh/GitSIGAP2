@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Run this script from the deployment directory on the VPS.
-# IMAGE_TAG should be set by the GitHub Actions deployment job.
-IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required (expected commit SHA)}"
-APP_IMAGE="${APP_IMAGE:?APP_IMAGE must be set to the GHCR app image, e.g. ghcr.io/org/repo-app}"
-NGINX_IMAGE="${NGINX_IMAGE:?NGINX_IMAGE must be set to the GHCR nginx image, e.g. ghcr.io/org/repo-nginx}"
+# Execute from any directory. IMAGE_TAG should be the commit SHA to deploy.
+ROOT_DIR="/opt/sigap"
+COMPOSE_FILE="$ROOT_DIR/deployment/docker-compose.yml"
+COMPOSE_ENV="$ROOT_DIR/deployment/.env"
+IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG is required (commit SHA)}"
+APP_IMAGE_BASE="${APP_IMAGE:?APP_IMAGE base name must be set (without tag)}"
+NGINX_IMAGE_BASE="${NGINX_IMAGE:?NGINX_IMAGE base name must be set (without tag)}"
 
-export APP_IMAGE="${APP_IMAGE}:${IMAGE_TAG}"
-export NGINX_IMAGE="${NGINX_IMAGE}:${IMAGE_TAG}"
+export APP_IMAGE="${APP_IMAGE_BASE}:${IMAGE_TAG}"
+export NGINX_IMAGE="${NGINX_IMAGE_BASE}:${IMAGE_TAG}"
 
-# Bring up DB first and wait for its Compose healthcheck.
-docker compose up -d db
+compose() {
+  docker compose --project-directory "$ROOT_DIR" --env-file "$COMPOSE_ENV" -f "$COMPOSE_FILE" "$@"
+}
 
-# Pull the new app/web images, then run migrations before replacing app containers.
-docker compose pull app nginx
-docker compose run --rm app php artisan migrate --force
 
-docker compose up -d --no-build app nginx scheduler
+# Pull images and migrate the existing host MySQL database before switching containers.
+compose pull app nginx
+compose run --rm app php artisan migrate --force
+compose up -d app nginx scheduler
 
 docker image prune -f
