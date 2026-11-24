@@ -166,9 +166,16 @@ export default function Navbar() {
                 <Link
                     to={isAdmin ? '/admin' : '/'}
                     aria-label={isAdmin ? 'Dashboard Admin SIGAP' : 'Homepage SIGAP'}
-                    className="font-display text-2xl font-semibold tracking-wide text-white"
+                    className="flex shrink-0 items-center gap-2 font-display text-2xl font-semibold tracking-wide text-white"
                 >
-                    <span className="text-accent">SI</span>GAP
+                    <img
+                        src="/images/logo-sigap.svg"
+                        alt=""
+                        className="h-10 w-10 object-contain"
+                    />
+                    <span>
+                        <span className="text-accent">SI</span>GAP
+                    </span>
                 </Link>
 
                 {/* Tombol menu mobile */}

@@ -1,0 +1,66 @@
+name: sigap-prod
+
+services:
+  app:
+    image: sigap-app:local
+    build:
+      context: /opt/sigap/app/SIGAP
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - /opt/sigap/app/SIGAP/.env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: https://sigap.bccdev.id
+      DB_HOST: 172.30.10.1
+      DB_PORT: 3306
+    volumes:
+      - sigap_storage:/var/www/html/storage
+    networks:
+      sigap-network:
+        ipv4_address: 172.30.10.3
+
+  nginx:
+    image: sigap-nginx:local
+    build:
+      context: /opt/sigap/app/SIGAP
+      dockerfile: docker/nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - sigap_storage:/var/www/html/storage:ro
+    depends_on:
+      - app
+    networks:
+      sigap-network:
+        ipv4_address: 172.30.10.2
+
+  scheduler:
+    image: sigap-app:local
+    restart: unless-stopped
+    env_file:
+      - /opt/sigap/app/SIGAP/.env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: https://sigap.bccdev.id
+      DB_HOST: 172.30.10.1
+      DB_PORT: 3306
+    command: ["php", "artisan", "schedule:work"]
+    volumes:
+      - sigap_storage:/var/www/html/storage
+    depends_on:
+      - app
+    networks:
+      sigap-network:
+        ipv4_address: 172.30.10.4
+
+volumes:
+  sigap_storage:
+    name: sigap_storage_prod
+
+networks:
+  sigap-network:
+    external: true
