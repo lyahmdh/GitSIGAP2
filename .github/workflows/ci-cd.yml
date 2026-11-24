@@ -97,33 +97,25 @@ jobs:
     name: Deploy to BCC VPS
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Trigger deployment on VPS
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
-          IMAGE_TAG: ${{ github.sha }}
-          IMAGE_NAMESPACE: ghcr.io/lyahmdh/sigap
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+      - name: Deploy directly on VPS
         run: |
-          ssh "$VPS_USER@$VPS_HOST" "mkdir -p '$DEPLOY_PATH/deployment' '$DEPLOY_PATH/scripts'"
-          scp SIGAP/deployment/docker-compose.yml "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/deployment/docker-compose.yml"
-          scp SIGAP/scripts/deploy.sh "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/scripts/deploy.sh"          
-          printf '%s' "$GHCR_READ_TOKEN" | ssh "$VPS_USER@$VPS_HOST" "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin && cd '$DEPLOY_PATH' && IMAGE_TAG='$IMAGE_TAG' APP_IMAGE='$IMAGE_NAMESPACE-app' NGINX_IMAGE='$IMAGE_NAMESPACE-nginx' bash ./scripts/deploy.sh"
+          cp SIGAP/deployment/docker-compose.yml /opt/sigap/deployment/docker-compose.yml
+          cp SIGAP/scripts/deploy.sh /opt/sigap/scripts/deploy.sh
+          chmod +x /opt/sigap/scripts/deploy.sh
+
+          IMAGE_TAG=latest \
+          APP_IMAGE=ghcr.io/lyahmdh/sigap-app \
+          NGINX_IMAGE=ghcr.io/lyahmdh/sigap-nginx \
+          bash /opt/sigap/scripts/deploy.sh
