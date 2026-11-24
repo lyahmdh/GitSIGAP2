@@ -2,7 +2,10 @@ name: sigap-prod
 
 services:
   app:
-    image: ${APP_IMAGE:-sigap-app:local}
+    image: sigap-app:local
+    build:
+      context: /opt/sigap/app/SIGAP
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - /opt/sigap/app/SIGAP/.env
@@ -19,7 +22,10 @@ services:
         ipv4_address: 172.30.10.3
 
   nginx:
-    image: ${NGINX_IMAGE:-sigap-nginx:local}
+    image: sigap-nginx:local
+    build:
+      context: /opt/sigap/app/SIGAP
+      dockerfile: docker/nginx/Dockerfile
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:80"
@@ -32,7 +38,7 @@ services:
         ipv4_address: 172.30.10.2
 
   scheduler:
-    image: ${APP_IMAGE:-sigap-app:local}
+    image: sigap-app:local
     restart: unless-stopped
     env_file:
       - /opt/sigap/app/SIGAP/.env
