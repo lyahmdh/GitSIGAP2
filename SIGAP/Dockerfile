@@ -25,6 +25,7 @@ RUN apk add --no-cache \
         libjpeg-turbo-dev \
         freetype-dev \
         libzip-dev \
+        oniguruma-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" pdo_mysql mbstring bcmath exif gd intl zip opcache pcntl \
     && apk del .build-deps
