@@ -19,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             headers: Request::HEADER_X_FORWARDED_FOR |
                      Request::HEADER_X_FORWARDED_HOST |
                      Request::HEADER_X_FORWARDED_PORT |
-                     Request::HEADER_X_FORWAR_PROTO
+                     Request::HEADER_X_FORWARDED_PROTO
         );
         // Aktifkan session/cookie authentication untuk first-party SPA (Sanctum).
         $middleware->statefulApi();
